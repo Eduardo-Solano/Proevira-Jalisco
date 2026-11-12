@@ -6,3 +6,8 @@
 .pub-cache/
 build/
 *.iml
+__pycache__/
+*.pyc
+*.db
+mobile/build/
+mobile/.dart_tool/
