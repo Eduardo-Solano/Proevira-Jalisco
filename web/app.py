@@ -1,5 +1,6 @@
-"""Aplicación principal de PROEVIRA Jalisco."""
+"""Aplicación principal de VIRALES Jalisco."""
 import base64
+from html import escape
 import os
 import sys
 import streamlit as st
@@ -30,9 +31,26 @@ def _salir_del_panel():
         api.logout()
 
 
+def _perfil_lateral():
+    if DEMO_MODE:
+        correo = "Usuario de demostración"
+    else:
+        correo = st.session_state.get("user_email") or "Usuario autenticado"
+
+    usuario = correo.split("@", 1)[0].strip()
+    iniciales = "".join(parte[0] for parte in usuario.replace("_", " ").replace(".", " ").split() if parte)
+    iniciales = (iniciales[:2] or "US").upper()
+    return (
+        '<div class="sidebar-profile">'
+        f'<div class="profile-avatar" role="img" aria-label="Perfil de usuario">{escape(iniciales)}</div>'
+        f'<strong class="profile-email" title="{escape(correo, quote=True)}">{escape(correo)}</strong>'
+        '</div>'
+    )
+
+
 # ── Configuración de página ──
 st.set_page_config(
-    page_title="PROEVIRA Jalisco",
+    page_title="VIRALES Jalisco",
     page_icon=LOGO_PATH,
     layout="wide",
     initial_sidebar_state="expanded"
@@ -63,6 +81,14 @@ section[data-testid="stSidebar"]:has(button[aria-label="Collapse sidebar"]) {
     flex-basis: 260px !important;
 }
 section[data-testid="stSidebar"] > div { background: #454545; }
+section[data-testid="stSidebar"] [data-testid="stSidebarHeader"] {
+    height: 40px !important;
+    min-height: 40px !important;
+    flex: 0 0 40px !important;
+}
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+    padding-top: 0 !important;
+}
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: #eaf1ee; }
 button[aria-label="Collapse sidebar"],
 button[aria-label="Expand sidebar"] {
@@ -74,23 +100,52 @@ section[data-testid="stSidebar"] button[aria-label="Collapse sidebar"] {
     color: #d3e2dd !important;
 }
 .sidebar-brand {
-    padding: .2rem 0 1.05rem;
+    padding: .1rem 0 .75rem;
     border-bottom: 1px solid rgba(255,255,255,.16);
     color: #f0b65c;
-    font-size: 1.02rem;
+    font-size: 1.2rem;
     font-weight: 700;
-    letter-spacing: .1px;
+    letter-spacing: .08em;
 }
 .sidebar-brand span {
     display: block;
-    margin-top: .25rem;
+    margin-top: .2rem;
     color: #b7ceca;
     font-size: .68rem;
     font-weight: 500;
-    letter-spacing: .4px;
+    letter-spacing: .02em;
+}
+.sidebar-profile {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    min-width: 0;
+    margin: 0 0 .8rem;
+}
+.profile-avatar {
+    display: grid;
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border-radius: 50%;
+    background: #f0b65c;
+    color: #393939;
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .03em;
+}
+.profile-email {
+    min-width: 0;
+    overflow: hidden;
+    color: #fff;
+    font-size: .74rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .sidebar-section {
-    margin: 1.35rem 0 .45rem;
+    margin: 1rem 0 .45rem;
     color: #c7c7c7;
     font-size: .66rem;
     font-weight: 700;
@@ -431,6 +486,7 @@ div[data-testid="stSlider"] label { color: #526861; font-weight: 600; }
     [data-testid="stMainBlockContainer"] { padding: 3.6rem .85rem .9rem; }
     .sidebar-footer { position: static; width: auto; margin-top: 2rem; }
     .st-key-sidebar_exit { position: static; width: auto; }
+    .sidebar-profile { max-width: 100%; }
     .risk-legend-note { width: 100%; margin-left: 0; }
     .st-key-header_exit { top: 16px; right: 8px; width: 60px; z-index: 1001; }
     .st-key-header_exit button { min-height: 34px; padding: 0 .45rem; }
@@ -473,7 +529,7 @@ header[data-testid="stHeader"]:has([data-testid="stExpandSidebarButton"])
     margin-left: 40px;
 }}
 header[data-testid="stHeader"] [data-testid="stToolbar"]::before {{
-    content: "Vigilancia epidemiológica\\A Dengue · Influenza · COVID-19";
+    content: "VIRALES · Vigilancia epidemiológica\\A Dengue · Influenza · COVID-19";
     white-space: pre-line;
     color: #454545;
     font: 700 1.08rem/1.35 "Segoe UI", "Aptos", sans-serif;
@@ -537,8 +593,9 @@ elif not DEMO_MODE and not st.session_state.get("auth_token"):
     render_auth_page()
 else:
     with st.sidebar:
+        st.markdown(_perfil_lateral(), unsafe_allow_html=True)
         st.markdown(
-            '<div class="sidebar-brand">PROEVIRA<span>Salud pública · Jalisco</span></div>',
+            '<div class="sidebar-brand">VIRALES<span>Jalisco</span></div>',
             unsafe_allow_html=True,
         )
         st.markdown('<div class="sidebar-section">Menú principal</div>', unsafe_allow_html=True)
@@ -551,7 +608,7 @@ else:
         )
         st.markdown(
             '<div class="sidebar-footer"><strong>Gobierno de Jalisco</strong>'
-            'Secretaría de Salud<br>Vigilancia epidemiológica</div>',
+            'Secretaría de Salud</div>',
             unsafe_allow_html=True,
         )
         with st.container(key="sidebar_exit"):

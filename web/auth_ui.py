@@ -63,7 +63,7 @@ def render_auth_page():
         st.markdown("""
             <div style="text-align: center; margin-bottom: 1.5rem;">
                 <span class="jal-gold-badge">Sistema Estatal de Salud</span>
-                <div class="jal-title">PROEVIRA JALISCO</div>
+                <div class="jal-title">VIRALES JALISCO</div>
                 <p style="color: #64748b; font-size: 0.88rem; margin-top: 4px;">
                     Plataforma de Vigilancia Epidemiológica y Alerta Temprana<br>
                     <strong>Dengue • Influenza • COVID-19</strong>
