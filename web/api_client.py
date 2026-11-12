@@ -9,7 +9,7 @@ import streamlit as st
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000/api/v1").rstrip("/")
 WS_BASE_URL = os.getenv("WS_BASE_URL", "ws://127.0.0.1:8000/ws/alerts")
 DEMO_MODE = os.getenv("PROEVIRA_DEMO_MODE", "false").strip().lower() in {"1", "true", "yes"}
-REQUEST_TIMEOUT = 5.0
+REQUEST_TIMEOUT = 20.0
 
 MUNICIPIOS_JALISCO = {
     "14039": {"nombre": "Guadalajara", "lat": 20.6767, "lon": -103.3475},

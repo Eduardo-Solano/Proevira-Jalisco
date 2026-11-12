@@ -74,6 +74,11 @@ def render_mapa_view():
 
     if DEMO_MODE:
         st.caption("Datos sintéticos de demostración; los casos mostrados son estimaciones, no confirmaciones.")
+    else:
+        st.caption(
+            f"El modelo proporciona datos para {len(df)} municipios de la Región Centro; "
+            "no representa cobertura de todo Jalisco."
+        )
 
     municipios = df.sort_values("municipio")["municipio"].tolist()
     mapa_col, detalle_col = st.columns([1.55, 1])
@@ -81,7 +86,13 @@ def render_mapa_view():
         with st.container(border=True):
             st.markdown('<div class="panel-title">Mapa epidemiológico</div>', unsafe_allow_html=True)
             st.caption(f"{enfermedad} · {semana} · {indicador}")
-            mapa = folium.Map(location=[20.6767, -103.3475], zoom_start=7, tiles="OpenStreetMap")
+            mapa = folium.Map(
+                location=[20.6597, -103.3496],
+                zoom_start=10,
+                tiles="OpenStreetMap",
+                prefer_canvas=True,
+            )
+            mapa.fit_bounds(df[["lat", "lon"]].values.tolist(), padding=(18, 18), max_zoom=11)
 
             if modo == "Mapa de calor":
                 peso_riesgo = {"bajo": 1, "medio": 2, "alto": 3, "crítico": 4}
@@ -105,7 +116,7 @@ def render_mapa_view():
                     popup = (
                         f"<b>{escape(str(fila.municipio))}</b><br>"
                         f"Riesgo: {escape(nivel)}<br>"
-                        f"Casos estimados: {int(fila.casos_esperados)}<br>"
+                        f"Casos esperados (proyección): {fila.casos_esperados:.2f}<br>"
                         f"Semana: {escape(semana)}"
                     )
                     folium.CircleMarker(
@@ -120,7 +131,13 @@ def render_mapa_view():
                         weight=2,
                     ).add_to(mapa)
 
-            st_folium(mapa, width="100%", height=480, key=f"map_{enfermedad}_{semana}_{modo[:3]}")
+            st_folium(
+                mapa,
+                height=480,
+                key=f"map_{enfermedad}_{semana}_{modo[:3]}",
+                returned_objects=[],
+                use_container_width=True,
+            )
             nota_leyenda = (
                     "Color e intensidad: riesgo; tamaño del marcador: casos estimados."
                     if indicador == "Nivel de riesgo"
@@ -149,6 +166,7 @@ def render_mapa_view():
                 f'<span class="status-dot" style="background:{color}"></span>Riesgo {escape(riesgo)}</span>',
                 unsafe_allow_html=True,
             )
-            st.metric("Casos estimados", f"{int(seleccionado['casos_esperados']):,}")
+            st.metric("Casos esperados (proyección)", f"{seleccionado['casos_esperados']:,.2f}")
             st.caption(f"{enfermedad} · Semana {semana}")
+            st.caption("Un valor 0.00 es una asignación del modelo, no confirma ausencia de casos.")
             st.caption("Los demás indicadores regionales no están disponibles en la fuente conectada.")

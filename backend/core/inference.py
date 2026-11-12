@@ -178,19 +178,38 @@ class InferenceEngine:
         """
         if not self.loaded:
             self.load()
+            if not self.loaded:
+                raise RuntimeError("El modelo predictivo no está disponible")
 
+        X_reg, ref_date = self._get_region_features(enfermedad)
+        log_pred = float(self.reg_region.predict(X_reg)[0])
+        pred_region = max(0.0, float(np.expm1(log_pred)))
+
+        semana_prediccion = semana
+        if not semana_prediccion:
+            next_date = ref_date + pd.Timedelta(days=7)
+            iso = next_date.isocalendar()
+            semana_prediccion = f"{iso.year}-W{iso.week:02d}"
+
+        shares = self.participacion_municipal.get(enfermedad, {})
+        thresholds_region = self.thresholds_region.get(enfermedad, [1.0, 5.0, 15.0])
         results = []
         for mid, info in self.municipios_coords.items():
-            pred = self.predict_municipio(mid, semana=semana, enfermedad=enfermedad)
+            casos_esperados = round(pred_region * shares.get(mid, 1.0 / 12.0), 2)
+            thresholds = self.thresholds_municipio.get(f"{mid}|{enfermedad}") or thresholds_region
+            risk_index = min(
+                int(np.searchsorted(thresholds, casos_esperados, side="left")),
+                len(self.labels) - 1,
+            )
             results.append({
                 "municipio": mid,
                 "nombre": info.get("nombre", ""),
                 "lat": info.get("lat", 0.0),
                 "lon": info.get("lon", 0.0),
-                "semana": pred["semana"],
+                "semana": semana_prediccion,
                 "enfermedad": enfermedad,
-                "casos_esperados": pred["casos_esperados"],
-                "nivel_riesgo": pred["nivel_riesgo"]
+                "casos_esperados": casos_esperados,
+                "nivel_riesgo": self.labels[risk_index],
             })
 
         results.sort(key=lambda x: x["casos_esperados"], reverse=True)
@@ -234,4 +253,3 @@ class InferenceEngine:
 
 
 inference_engine = InferenceEngine()
-

@@ -51,7 +51,7 @@ def render_resumen_view():
         return
 
     enfermedad_seleccionada = ENFERMEDADES[enfermedad]
-    total_estimado = int(df["casos_esperados"].sum()) if enfermedad_seleccionada else None
+    total_estimado = float(df["casos_esperados"].sum()) if enfermedad_seleccionada else None
     municipios_riesgo = int(
         df.loc[df["nivel_riesgo"].astype(str).str.lower().isin(["alto", "crítico"]), "municipio_id"].nunique()
     )
@@ -60,7 +60,7 @@ def render_resumen_view():
     valores = (
         (
             "Casos estimados",
-            f"{total_estimado:,.1f}" if total_estimado is not None else "Consulta una enfermedad",
+            f"{total_estimado:,.2f}" if total_estimado is not None else "Consulta una enfermedad",
             f"Proyección {semana}" if total_estimado is not None else "No se suman enfermedades distintas",
         ),
         ("Municipios en riesgo alto o crítico", str(municipios_riesgo), "Según nivel de riesgo disponible"),
