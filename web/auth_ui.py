@@ -91,19 +91,6 @@ def render_auth_page():
                         else:
                             st.error(result.get("error", "Error de autenticación"))
             
-            # Accesos de prueba rápidos
-            st.markdown("---")
-            st.caption("⚡ **Accesos directos (Modo Demostración / Desarrollo):**")
-            c_btn1, c_btn2 = st.columns(2)
-            with c_btn1:
-                if st.button("🏛️ Como Funcionario SSJ", use_container_width=True):
-                    api.login("funcionario@saludjalisco.gob.mx", "demo123")
-                    st.rerun()
-            with c_btn2:
-                if st.button("🩺 Como Médico Tratante", use_container_width=True):
-                    api.login("dr.garcia@hospitalgdl.gob.mx", "demo123")
-                    st.rerun()
-
         with tab_registro:
             st.markdown("##### Solicitud de Alta de Personal Médico")
             st.caption("El acceso médico requiere verificación posterior de su cédula profesional ante el registro estatal.")

@@ -12,9 +12,6 @@ ENFERMEDADES = {
     "Influenza": "influenza",
     "Dengue": "dengue",
 }
-PERIODOS = ["2026-W20 (Actual)", "2026-W19", "2026-W18", "2026-W17"]
-
-
 def _obtener_datos(semana: str, enfermedad: str | None) -> list[dict]:
     if enfermedad:
         return api.get_predictions_bulk(semana=semana, enfermedad=enfermedad)
@@ -32,12 +29,17 @@ def render_resumen_view():
         unsafe_allow_html=True,
     )
 
+    resumen = api.get_dashboard_summary()
+    semana_disponible = resumen.get("semana")
+    if not semana_disponible:
+        st.info("El backend todavía no reporta una semana de proyección.")
+        return
+
     filtro_enfermedad, filtro_periodo = st.columns(2)
     with filtro_enfermedad:
         enfermedad = st.selectbox("Enfermedad", list(ENFERMEDADES), key="overview_disease")
     with filtro_periodo:
-        periodo = st.selectbox("Periodo de consulta", PERIODOS, key="overview_period")
-    semana = periodo.split(" ")[0]
+        semana = st.selectbox("Semana de proyección", [semana_disponible], key="overview_period")
 
     if DEMO_MODE:
         st.caption("Datos sintéticos de demostración; no representan casos confirmados.")
@@ -58,8 +60,8 @@ def render_resumen_view():
     valores = (
         (
             "Casos estimados",
-            f"{total_estimado:,}" if total_estimado is not None else "Consulta una enfermedad",
-            f"Periodo {semana}" if total_estimado is not None else "No se suman enfermedades distintas",
+            f"{total_estimado:,.1f}" if total_estimado is not None else "Consulta una enfermedad",
+            f"Proyección {semana}" if total_estimado is not None else "No se suman enfermedades distintas",
         ),
         ("Municipios en riesgo alto o crítico", str(municipios_riesgo), "Según nivel de riesgo disponible"),
         ("Tasa de incidencia", "No disponible", "No existe una tasa en los datos de esta vista"),
@@ -74,39 +76,40 @@ def render_resumen_view():
             )
 
     st.markdown("")
-    serie_region = df.sort_values("casos_esperados", ascending=False).iloc[0]
-    enfermedad_serie = str(serie_region.get("enfermedad", "dengue")).lower()
-    datos_historicos = api.get_prediction_history(
-        str(serie_region["municipio_id"]),
-        enfermedad=enfermedad_serie,
-        semanas=12,
-    )
-    df_historico = pd.DataFrame(datos_historicos.get("historico", []))
+    df_historico = pd.DataFrame(resumen.get("tendencia", []))
     with st.container(border=True):
-        municipio_serie = str(serie_region["municipio"])
-        st.markdown(
-            f'<div class="panel-title">Evolución histórica disponible · {municipio_serie}</div>',
-            unsafe_allow_html=True,
-        )
-        st.caption(
-            f"Serie histórica de {enfermedad_serie.upper()}; el periodo del filtro aplica a la distribución territorial."
-        )
+        st.markdown('<div class="panel-title">Evolución histórica regional</div>', unsafe_allow_html=True)
+        st.caption("Casos observados por semana, según la serie histórica del backend.")
         if df_historico.empty:
             st.info("La fuente no proporcionó una serie histórica para estos filtros.")
         else:
+            enfermedades_grafica = {
+                codigo: nombre
+                for nombre, codigo in (("COVID-19", "covid"), ("Influenza", "influenza"), ("Dengue", "dengue"))
+            }
+            codigo_seleccionado = ENFERMEDADES[enfermedad]
+            if codigo_seleccionado == "covid-19":
+                codigo_seleccionado = "covid"
+            series = list(enfermedades_grafica) if codigo_seleccionado is None else [codigo_seleccionado]
+            df_linea = df_historico.melt(
+                id_vars="semana",
+                value_vars=series,
+                var_name="codigo_enfermedad",
+                value_name="casos",
+            )
+            df_linea["Enfermedad"] = df_linea["codigo_enfermedad"].map(enfermedades_grafica)
             fig_hist = px.line(
-                df_historico,
+                df_linea,
                 x="semana",
                 y="casos",
+                color="Enfermedad",
                 markers=True,
-                labels={"semana": "Semana epidemiológica", "casos": "Casos históricos"},
+                labels={"semana": "Semana epidemiológica", "casos": "Casos observados"},
             )
-            fig_hist.update_traces(line_color="#4e9577", line_width=3)
             fig_hist.update_layout(
                 template="plotly_white",
                 height=300,
                 margin=dict(l=5, r=10, t=10, b=5),
-                showlegend=False,
             )
             st.plotly_chart(fig_hist, use_container_width=True)
 
@@ -138,11 +141,12 @@ def render_resumen_view():
     with comparativa:
         with st.container(border=True):
             st.markdown('<div class="panel-title">Comparativa entre enfermedades</div>', unsafe_allow_html=True)
-            filas = []
-            for nombre, codigo in (("COVID-19", "covid-19"), ("Influenza", "influenza"), ("Dengue", "dengue")):
-                comparacion = pd.DataFrame(api.get_predictions_bulk(semana=semana, enfermedad=codigo))
-                if not comparacion.empty:
-                    filas.append({"Enfermedad": nombre, "Casos estimados": int(comparacion["casos_esperados"].sum())})
+            totales = resumen.get("totales", {})
+            filas = [
+                {"Enfermedad": nombre, "Casos estimados": round(float(totales[codigo]), 1)}
+                for nombre, codigo in (("COVID-19", "covid"), ("Influenza", "influenza"), ("Dengue", "dengue"))
+                if codigo in totales
+            ]
             if filas:
                 st.dataframe(pd.DataFrame(filas), hide_index=True, use_container_width=True)
 

@@ -26,7 +26,14 @@ def render_mapa_view():
     )
 
     enfermedades = {"COVID-19": "covid-19", "Influenza": "influenza", "Dengue": "dengue"}
-    periodos = ["2026-W20 (Actual)", "2026-W19", "2026-W18", "2026-W17"]
+    if DEMO_MODE:
+        periodos = ["2026-W20 (Demostración)"]
+    else:
+        semana_prediccion = api.get_model_info().get("semana_prediccion")
+        if not semana_prediccion:
+            st.info("El backend no reporta una semana de proyección disponible.")
+            return
+        periodos = [semana_prediccion]
     indicadores = [
         "Casos estimados",
         "Casos registrados",

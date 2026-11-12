@@ -6,7 +6,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
-from api_client import api, MUNICIPIOS_JALISCO
+from api_client import DEMO_MODE, api, MUNICIPIOS_JALISCO
 
 
 def render_predicciones_view():
@@ -35,20 +35,26 @@ def render_predicciones_view():
         )
 
     with f3:
-        horizonte = st.selectbox("Horizonte de predicción", [1, 2, 3, 4], index=3, format_func=lambda n: f"{n} semana{'s' if n != 1 else ''}", key="pred_horizon")
+        horizontes = [1, 2, 3, 4] if DEMO_MODE else [1]
+        horizonte = st.selectbox(
+            "Horizonte de predicción",
+            horizontes,
+            format_func=lambda n: f"{n} semana{'s' if n != 1 else ''}",
+            key="pred_horizon",
+        )
 
     semanas = st.slider("Semanas históricas para comparar", 8, 24, 12, 2, key="pred_sem")
 
     hist_data = api.get_prediction_history(mun, enfermedad=enf, semanas=semanas)
-    shap_data = api.get_prediction_explain(mun)
+    shap_data = api.get_prediction_explain(mun, enfermedad=enf)
+    model_info = api.get_model_info()
+    metricas_modelo = api.get_model_metrics()
     st.markdown("#### Modelo y horizonte")
-    model_col, training_col, updated_col = st.columns(3)
-    model_col.metric("Modelo", "Random Forest")
-    training_col.metric("Periodo de entrenamiento", "No disponible")
-    updated_col.metric("Última actualización", "No disponible")
-    st.caption(
-        "La fuente conectada no expone fechas de entrenamiento/actualización ni intervalos de confianza."
-    )
+    model_col, data_col, training_col, forecast_col = st.columns(4)
+    model_col.metric("Modelo", model_info.get("modelo", "Random Forest"))
+    data_col.metric("Última semana observada", model_info.get("ultima_semana_datos") or "No disponible")
+    training_col.metric("Entrenamiento", model_info.get("fecha_entrenamiento") or "No disponible")
+    forecast_col.metric("Semana proyectada", model_info.get("semana_prediccion") or "No disponible")
 
     # ── Curva epidemiológica ──
     st.markdown("#### Casos históricos y proyección")
@@ -56,69 +62,99 @@ def render_predicciones_view():
     df_h = pd.DataFrame(hist_data["historico"])
     df_p = pd.DataFrame(hist_data["prediccion"]).head(horizonte)
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=df_h.semana, y=df_h.casos,
-        mode="lines+markers", name="Histórico reportado",
-        line=dict(color="#003366", width=3), marker=dict(size=6),
-    ))
-    # Línea de conexión
-    fig.add_trace(go.Scatter(
-        x=[df_h.semana.iloc[-1], df_p.semana.iloc[0]],
-        y=[df_h.casos.iloc[-1], df_p.casos.iloc[0]],
-        mode="lines", line=dict(color="#d32f2f", width=2, dash="dot"), showlegend=False,
-    ))
-    fig.add_trace(go.Scatter(
-        x=df_p.semana, y=df_p.casos,
-        mode="lines+markers", name="Proyección (no confirmada)",
-        line=dict(color="#d32f2f", width=3, dash="dash"),
-        marker=dict(size=8, symbol="diamond", color="#d32f2f"),
-    ))
-    fig.update_layout(
-        xaxis_title="Semana epidemiológica", yaxis_title="Casos",
-        template="plotly_white", hovermode="x unified", height=370,
-        legend=dict(orientation="h", y=1.02, xanchor="right", x=1),
-        margin=dict(l=10, r=10, t=20, b=10),
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    if df_h.empty:
+        st.info("No hay semanas históricas disponibles para la región y enfermedad seleccionadas.")
+    elif df_p.empty:
+        st.info("El backend no devolvió una proyección para esta selección.")
+    else:
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=df_h.semana, y=df_h.casos,
+            mode="lines+markers", name="Casos históricos observados",
+            line=dict(color="#003366", width=3), marker=dict(size=6),
+        ))
+        fig.add_trace(go.Scatter(
+            x=[df_h.semana.iloc[-1], df_p.semana.iloc[0]],
+            y=[df_h.casos.iloc[-1], df_p.casos.iloc[0]],
+            mode="lines", line=dict(color="#d32f2f", width=2, dash="dot"), showlegend=False,
+        ))
+        fig.add_trace(go.Scatter(
+            x=df_p.semana, y=df_p.casos,
+            mode="lines+markers", name="Proyección (no confirmada)",
+            line=dict(color="#d32f2f", width=3, dash="dash"),
+            marker=dict(size=8, symbol="diamond", color="#d32f2f"),
+        ))
+        fig.update_layout(
+            xaxis_title="Semana epidemiológica", yaxis_title="Casos",
+            template="plotly_white", hovermode="x unified", height=370,
+            legend=dict(orientation="h", y=1.02, xanchor="right", x=1),
+            margin=dict(l=10, r=10, t=20, b=10),
+        )
+        st.plotly_chart(fig, use_container_width=True)
     st.caption("La línea continua representa valores históricos; la línea discontinua son proyecciones, no casos confirmados.")
 
     # ── Métricas disponibles ──
     st.markdown("#### Evaluación del modelo")
-    evaluacion = st.columns(4)
-    for columna, metrica in zip(evaluacion, ("R²", "MAE", "RMSE", "Otras métricas")):
-        columna.metric(metrica, "No disponible")
-    st.caption("La API actual no proporciona métricas de evaluación ni escenarios comparativos.")
+    disease_key = "covid" if enf == "covid-19" else enf
+    test_metrics = (
+        metricas_modelo.get("test", {})
+        .get("municipal", {})
+        .get(disease_key, {})
+        .get("reparto", {})
+        if metricas_modelo
+        else {}
+    )
+    muestras_evaluacion = (
+        metricas_modelo.get("test", {}).get("municipal", {}).get(disease_key, {}).get("n")
+        if metricas_modelo
+        else None
+    )
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("MAE", f"{test_metrics['mae']:.3f}" if "mae" in test_metrics else "No disponible")
+    metric_cols[1].metric("RMSE", f"{test_metrics['rmse']:.3f}" if "rmse" in test_metrics else "No disponible")
+    metric_cols[2].metric("F1 macro", f"{test_metrics['f1_macro']:.3f}" if "f1_macro" in test_metrics else "No disponible")
+    metric_cols[3].metric(
+        "Muestras de evaluación",
+        f"{muestras_evaluacion:,}" if muestras_evaluacion is not None else "No disponible",
+    )
+    split = metricas_modelo.get("split", {}) if metricas_modelo else {}
+    st.caption(
+        f"Métricas de reparto municipal en el conjunto de prueba; corte temporal: "
+        f"{split.get('corte_test', 'No disponible')}. No se generan escenarios ni intervalos de confianza."
+    )
 
     # ── SHAP ──
     st.markdown("#### Factores explicativos (SHAP)")
-    st.caption("Contribución de cada variable al nivel de riesgo predicho por el modelo.")
+    st.caption("Importancia global de las variables del modelo; el servicio no devuelve el efecto local de cada variable.")
 
     col_chart, col_info = st.columns([3, 2])
 
-    df_shap = pd.DataFrame(shap_data["feature_importance"])
+    df_shap = pd.DataFrame(shap_data.get("feature_importance", []))
 
     with col_chart:
-        fig_s = px.bar(
-            df_shap.sort_values("shap", ascending=True),
-            x="shap", y="feature", orientation="h",
-            labels={"shap": "Valor SHAP", "feature": ""},
-            color="impacto",
-            color_discrete_map={"Aumenta riesgo": "#d32f2f", "Disminuye riesgo": "#2e7d32"},
-        )
-        fig_s.update_layout(
-            template="plotly_white", height=320,
-            margin=dict(l=10, r=10, t=10, b=10),
-            legend=dict(orientation="h", y=1.06, xanchor="right", x=1),
-        )
-        st.plotly_chart(fig_s, use_container_width=True)
+        if df_shap.empty:
+            st.info("No hay importancias SHAP disponibles para mostrar.")
+        else:
+            fig_s = px.bar(
+                df_shap.sort_values("shap", ascending=True),
+                x="shap", y="feature", orientation="h",
+                labels={"shap": "Importancia global SHAP", "feature": ""},
+                color_discrete_sequence=["#4e9577"],
+            )
+            fig_s.update_layout(
+                template="plotly_white", height=320,
+                margin=dict(l=10, r=10, t=10, b=10),
+                showlegend=False,
+            )
+            st.plotly_chart(fig_s, use_container_width=True)
 
     with col_info:
-        st.markdown(f"""
-        **{MUNICIPIOS_JALISCO[mun]['nombre']}**
-
-        - **Mayor factor de riesgo:** Precipitación pluvial acumulada y rezago de casos confirmados.
-        - **Factor protector:** Operativos activos de control de vectores y fumigación.
-
-        *Acción sugerida:* Reforzar vigilancia en unidades de primer nivel y muestreo intensivo en pacientes febriles.
-        """)
+        if df_p.empty:
+            st.info("No hay una proyección disponible para esta selección.")
+        else:
+            forecast = df_p.iloc[0]
+            st.markdown(f"**{MUNICIPIOS_JALISCO[mun]['nombre']} · {enf.upper()}**")
+            st.metric("Casos esperados (proyección)", f"{float(forecast['casos']):,.1f}")
+            if "nivel" in forecast:
+                st.metric("Nivel de riesgo proyectado", str(forecast["nivel"]).capitalize())
+            st.caption("La importancia global SHAP no indica por sí sola si una variable aumenta o reduce el riesgo.")

@@ -90,8 +90,16 @@ def render_reportes_view():
             key="report_municipio",
         )
     with periodo_col:
+        semana_prediccion = (
+            "2026-W20"
+            if DEMO_MODE
+            else api.get_model_info().get("semana_prediccion")
+        )
+        if tipo == "geografico" and not semana_prediccion:
+            st.info("El backend no reporta una semana de proyección disponible.")
+            return
         opciones_periodo = (
-            ["2026-W20", "2026-W19", "2026-W18", "2026-W17"]
+            [semana_prediccion]
             if tipo == "geografico"
             else ["8", "12", "24"]
         )

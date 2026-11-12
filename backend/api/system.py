@@ -1,6 +1,7 @@
 import os
 import json
-from fastapi import APIRouter, Depends
+import pandas as pd
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from backend.db.database import get_db
@@ -40,10 +41,49 @@ def version_info():
         except Exception:
             pass
 
+    latest_week = None
+    predicted_week = None
+    if inference_engine.loaded and inference_engine.raw_data is not None:
+        latest_date = inference_engine.raw_data["fecha_inicio_semana"].max()
+        if not pd.isna(latest_date):
+            latest_week = str(inference_engine.raw_data.loc[
+                inference_engine.raw_data["fecha_inicio_semana"] == latest_date,
+                "semana",
+            ].iloc[0])
+            next_week = (pd.Timestamp(latest_date) + pd.Timedelta(days=7)).isocalendar()
+            predicted_week = f"{next_week.year}-W{next_week.week:02d}"
+
     return {
         "api": "1.0",
         "modelo": "rf-regresor-regional-v1",
         "fecha_entrenamiento": fecha_entrenamiento,
+        "ultima_semana_datos": latest_week,
+        "semana_prediccion": predicted_week,
         "sistema": settings.PROJECT_NAME
     }
 
+
+@router.get("/model/metrics")
+def model_metrics():
+    """Publica las métricas de evaluación generadas por model/train.py."""
+    metricas_path = os.path.join(settings.MODEL_ARTIFACTS_DIR, "metricas.json")
+    if not os.path.exists(metricas_path):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No se encontraron métricas de entrenamiento. Ejecuta model/train.py.",
+        )
+
+    try:
+        with open(metricas_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No se pudieron leer las métricas del modelo.",
+        ) from error
+
+    return {
+        "fecha_entrenamiento": data.get("fecha_entrenamiento"),
+        "split": data.get("split", {}),
+        "test": data.get("test", {}),
+    }

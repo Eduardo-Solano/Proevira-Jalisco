@@ -15,7 +15,7 @@ from views.alertas import render_alertas_view
 from views.datos import render_datos_view
 from views.reportes import render_reportes_view
 from auth_ui import render_auth_page
-from api_client import DEMO_MODE
+from api_client import DEMO_MODE, ApiError
 
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "jalisco.png")
 with open(LOGO_PATH, "rb") as logo_file:
@@ -564,18 +564,21 @@ else:
             _salir_del_panel()
             st.rerun()
 
-    if seccion == NAV[0]:
-        render_resumen_view()
-    elif seccion == NAV[1]:
-        render_mapa_view()
-    elif seccion == NAV[2]:
-        render_predicciones_view()
-    elif seccion == NAV[3]:
-        render_datos_view()
-    elif seccion == NAV[4]:
-        render_reportes_view()
-    elif seccion == NAV[5]:
-        render_alertas_view()
+    try:
+        if seccion == NAV[0]:
+            render_resumen_view()
+        elif seccion == NAV[1]:
+            render_mapa_view()
+        elif seccion == NAV[2]:
+            render_predicciones_view()
+        elif seccion == NAV[3]:
+            render_datos_view()
+        elif seccion == NAV[4]:
+            render_reportes_view()
+        elif seccion == NAV[5]:
+            render_alertas_view()
+    except ApiError as error:
+        st.error(f"No se pudo consultar la información del backend. {error}")
 
     st.markdown("""
     <div class="footer">

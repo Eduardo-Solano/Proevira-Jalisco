@@ -208,7 +208,8 @@ proyecto-dengue-influenza-covid/
 | `/dashboard/kpis` | `GET` | `funcionario` | KPIs rápidos de monitoreo | — | `{casos_semana, municipios_riesgo_alto, alertas_activas, hospitalizaciones_est}` |
 | `/dashboard/heatmap` | `GET` | `funcionario`/`medico` | Datos listos para `folium` (GeoJSON + valores) | `?semana=2026-W20` | `{geojson, valores: {municipio_id: nivel}}` |
 | `/health` | `GET` | público | Healthcheck para Render/Fly.io | — | `{status: "ok", modelo_cargado: true, db: "ok"}` |
-| `/version` | `GET` | público | Versión de API y modelo | — | `{api: "1.0", modelo: "rf-v1", fecha_entrenamiento}` |
+| `/version` | `GET` | público | Versión, rango de datos y siguiente semana proyectada | — | `{api, modelo, fecha_entrenamiento, ultima_semana_datos, semana_prediccion}` |
+| `/model/metrics` | `GET` | público | Métricas de prueba exportadas por `model/train.py` | — | `{fecha_entrenamiento, split, test}` |
 
 ---
 
@@ -293,4 +294,4 @@ python backend/db/seed.py && uvicorn backend.main:app --reload --port 8000
 streamlit run web/app.py
 ```
 
-El dashboard abre por defecto en modo de demostración, con datos sintéticos y sin llamadas de lectura o escritura al backend. Para exigir inicio de sesión y conectar el panel con la API, inicia Streamlit con `PROEVIRA_DEMO_MODE=false`.
+El dashboard se conecta al backend por defecto (`http://127.0.0.1:8000/api/v1`) y requiere iniciar sesión con un usuario creado en el backend. Puedes configurar otra URL mediante `API_BASE_URL`. Para abrir únicamente la demostración sintética, inicia Streamlit con `PROEVIRA_DEMO_MODE=true`.
