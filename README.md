@@ -292,3 +292,5 @@ python backend/db/seed.py && uvicorn backend.main:app --reload --port 8000
 # 3. Levantar Dashboard Web Streamlit (en una segunda terminal)
 streamlit run web/app.py
 ```
+
+El dashboard abre por defecto en modo de demostración, con datos sintéticos y sin llamadas de lectura o escritura al backend. Para exigir inicio de sesión y conectar el panel con la API, inicia Streamlit con `PROEVIRA_DEMO_MODE=false`.
