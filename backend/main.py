@@ -1,4 +1,5 @@
 import logging
+from sqlalchemy import text
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
@@ -65,5 +66,15 @@ app.include_router(dashboard.router, prefix="")
 @app.on_event("startup")
 async def on_startup():
     logger.info("Iniciando Proevira Jalisco Backend...")
+    # Keep existing SQLite prototypes compatible after adding optional symptom fields.
+    from backend.db.database import engine
+    if settings.DATABASE_URL.startswith("sqlite"):
+        with engine.begin() as connection:
+            columns = connection.execute(
+                text("PRAGMA table_info(sintomas)")
+            ).fetchall()
+            if columns and not any(row[1] == "temperatura" for row in columns):
+                connection.execute(
+                    text("ALTER TABLE sintomas ADD COLUMN temperatura FLOAT")
+                )
     logger.info(f"API Documentación disponible en /docs")
-
