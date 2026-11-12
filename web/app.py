@@ -12,6 +12,8 @@ from views.resumen import render_resumen_view
 from views.mapa import render_mapa_view
 from views.predicciones import render_predicciones_view
 from views.alertas import render_alertas_view
+from views.datos import render_datos_view
+from views.reportes import render_reportes_view
 from auth_ui import render_auth_page
 from api_client import DEMO_MODE
 
@@ -394,6 +396,19 @@ section[data-testid="stSidebar"] div[data-testid="stRadio"] label p {
     font-weight: 600;
 }
 .metric-sub { margin-top: 3px; color: #84918b; font-size: .72rem; }
+.overview-signal {
+    display: flex;
+    justify-content: space-between;
+    gap: .7rem;
+    margin-top: .55rem;
+    padding: .7rem .8rem;
+    border-left: 3px solid var(--disease-color);
+    border-radius: 6px;
+    background: var(--disease-bg);
+    color: #526861;
+    font-size: .78rem;
+}
+.overview-signal strong { color: #31544e; }
 .disclaimer-box {
     margin-top: 2rem;
     padding: .7rem 1rem;
@@ -425,7 +440,14 @@ div[data-testid="stSlider"] label { color: #526861; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
-NAV = ["◫   Resumen", "⌖   Mapa de riesgo", "↗   Predicciones", "!   Alertas"]
+NAV = [
+    "◫   Panorama",
+    "⌖   Mapa epidemiológico",
+    "↗   Predicciones",
+    "▤   Gestión de datos",
+    "▧   Reportes",
+    "!   Alertas",
+]
 
 if DEMO_MODE and st.session_state.get("demo_exit"):
     st.markdown("""
@@ -454,7 +476,7 @@ else:
         seccion = st.radio(
             "Navegación",
             NAV,
-            index=1,
+            index=0,
             label_visibility="collapsed",
             key="main_navigation",
         )
@@ -491,6 +513,10 @@ else:
     elif seccion == NAV[2]:
         render_predicciones_view()
     elif seccion == NAV[3]:
+        render_datos_view()
+    elif seccion == NAV[4]:
+        render_reportes_view()
+    elif seccion == NAV[5]:
         render_alertas_view()
 
     st.markdown("""

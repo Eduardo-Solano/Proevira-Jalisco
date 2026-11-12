@@ -10,12 +10,17 @@ from api_client import api, MUNICIPIOS_JALISCO
 
 
 def render_predicciones_view():
+    st.markdown(
+        '<div class="page-heading">Análisis predictivo</div>'
+        '<div class="page-description">Consulta las proyecciones y explicabilidad disponibles para cada municipio.</div>',
+        unsafe_allow_html=True,
+    )
+
     # ── Filtros ──
     f1, f2, f3 = st.columns(3)
-
     with f1:
         mun = st.selectbox(
-            "Municipio",
+            "Región geográfica",
             list(MUNICIPIOS_JALISCO.keys()),
             format_func=lambda k: MUNICIPIOS_JALISCO[k]["nombre"],
             key="pred_mun",
@@ -23,30 +28,38 @@ def render_predicciones_view():
 
     with f2:
         enf = st.selectbox(
-            "Patología",
+            "Enfermedad",
             ["dengue", "influenza", "covid-19"],
             format_func=lambda x: {"dengue": "Dengue", "influenza": "Influenza", "covid-19": "COVID-19"}[x],
             key="pred_enf",
         )
 
     with f3:
-        semanas = st.slider("Semanas históricas", 8, 24, 12, 2, key="pred_sem")
+        horizonte = st.selectbox("Horizonte de predicción", [1, 2, 3, 4], index=3, format_func=lambda n: f"{n} semana{'s' if n != 1 else ''}", key="pred_horizon")
 
-    st.markdown("---")
+    semanas = st.slider("Semanas históricas para comparar", 8, 24, 12, 2, key="pred_sem")
 
     hist_data = api.get_prediction_history(mun, enfermedad=enf, semanas=semanas)
     shap_data = api.get_prediction_explain(mun)
+    st.markdown("#### Modelo y horizonte")
+    model_col, training_col, updated_col = st.columns(3)
+    model_col.metric("Modelo", "Random Forest")
+    training_col.metric("Periodo de entrenamiento", "No disponible")
+    updated_col.metric("Última actualización", "No disponible")
+    st.caption(
+        "La fuente conectada no expone fechas de entrenamiento/actualización ni intervalos de confianza."
+    )
 
     # ── Curva epidemiológica ──
-    st.markdown("##### Tendencia histórica y proyección a 4 semanas")
+    st.markdown("#### Casos históricos y proyección")
 
     df_h = pd.DataFrame(hist_data["historico"])
-    df_p = pd.DataFrame(hist_data["prediccion"])
+    df_p = pd.DataFrame(hist_data["prediccion"]).head(horizonte)
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=df_h.semana, y=df_h.casos,
-        mode="lines+markers", name="Observado",
+        mode="lines+markers", name="Histórico reportado",
         line=dict(color="#003366", width=3), marker=dict(size=6),
     ))
     # Línea de conexión
@@ -57,7 +70,7 @@ def render_predicciones_view():
     ))
     fig.add_trace(go.Scatter(
         x=df_p.semana, y=df_p.casos,
-        mode="lines+markers", name="Proyección (Random Forest)",
+        mode="lines+markers", name="Proyección (no confirmada)",
         line=dict(color="#d32f2f", width=3, dash="dash"),
         marker=dict(size=8, symbol="diamond", color="#d32f2f"),
     ))
@@ -68,11 +81,17 @@ def render_predicciones_view():
         margin=dict(l=10, r=10, t=20, b=10),
     )
     st.plotly_chart(fig, use_container_width=True)
+    st.caption("La línea continua representa valores históricos; la línea discontinua son proyecciones, no casos confirmados.")
 
-    st.markdown("---")
+    # ── Métricas disponibles ──
+    st.markdown("#### Evaluación del modelo")
+    evaluacion = st.columns(4)
+    for columna, metrica in zip(evaluacion, ("R²", "MAE", "RMSE", "Otras métricas")):
+        columna.metric(metrica, "No disponible")
+    st.caption("La API actual no proporciona métricas de evaluación ni escenarios comparativos.")
 
     # ── SHAP ──
-    st.markdown("##### Factores determinantes del riesgo (SHAP)")
+    st.markdown("#### Factores explicativos (SHAP)")
     st.caption("Contribución de cada variable al nivel de riesgo predicho por el modelo.")
 
     col_chart, col_info = st.columns([3, 2])
