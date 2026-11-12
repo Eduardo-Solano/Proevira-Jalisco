@@ -21,6 +21,15 @@ LOGO_PATH = os.path.join(BASE_DIR, "assets", "jalisco.png")
 with open(LOGO_PATH, "rb") as logo_file:
     LOGO_BASE64 = base64.b64encode(logo_file.read()).decode("ascii")
 
+
+def _salir_del_panel():
+    if DEMO_MODE:
+        st.session_state["demo_exit"] = True
+    else:
+        from api_client import api
+        api.logout()
+
+
 # ── Configuración de página ──
 st.set_page_config(
     page_title="PROEVIRA Jalisco",
@@ -39,21 +48,21 @@ st.markdown("""
 }
 [data-testid="stSidebarNav"] { display: none !important; }
 [data-testid="stAppDeployButton"], [data-testid="stMainMenu"] { display: none !important; }
-[data-testid="stAppViewContainer"], .stApp { background: #f5f7f5; }
+[data-testid="stAppViewContainer"], .stApp { background: #eef1f4; }
 [data-testid="stMainBlockContainer"] {
     max-width: none;
     padding: 4rem 1.7rem 1rem;
 }
 section[data-testid="stSidebar"] {
-    background: #183f46;
-    border-right: 1px solid #14373d;
+    background: #454545;
+    border-right: 1px solid #383838;
 }
 section[data-testid="stSidebar"]:has(button[aria-label="Collapse sidebar"]) {
     width: 260px !important;
     min-width: 260px !important;
     flex-basis: 260px !important;
 }
-section[data-testid="stSidebar"] > div { background: #183f46; }
+section[data-testid="stSidebar"] > div { background: #454545; }
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: #eaf1ee; }
 button[aria-label="Collapse sidebar"],
 button[aria-label="Expand sidebar"] {
@@ -82,7 +91,7 @@ section[data-testid="stSidebar"] button[aria-label="Collapse sidebar"] {
 }
 .sidebar-section {
     margin: 1.35rem 0 .45rem;
-    color: #a9c1bc;
+    color: #c7c7c7;
     font-size: .66rem;
     font-weight: 700;
     letter-spacing: .8px;
@@ -110,7 +119,8 @@ section[data-testid="stSidebar"] div[data-testid="stRadio"] label:hover {
     color: #fff;
 }
 section[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-selected="true"] {
-    background: #2c5c5c;
+    background: #606060;
+    box-shadow: inset 3px 0 #f0b65c;
     color: #fff;
 }
 section[data-testid="stSidebar"] div[data-testid="stRadio"] label p {
@@ -141,7 +151,7 @@ section[data-testid="stSidebar"] div[data-testid="stRadio"] label p {
     width: 208px;
     padding-top: .8rem;
     border-top: 1px solid rgba(255,255,255,.16);
-    color: #b7ceca;
+    color: #c7c7c7;
     font-size: .72rem;
     line-height: 1.5;
 }
@@ -162,6 +172,26 @@ section[data-testid="stSidebar"] div[data-testid="stRadio"] label p {
     border-color: #e0a878;
     color: #fff;
     background: rgba(255,255,255,.08);
+}
+.st-key-header_exit {
+    position: fixed;
+    top: 17px;
+    right: 12px;
+    z-index: 1001;
+    width: 76px;
+}
+.st-key-header_exit button {
+    min-height: 36px;
+    border: 1px solid #d3d8de;
+    border-radius: 6px;
+    color: #454545;
+    background: #fff;
+    font-weight: 600;
+}
+.st-key-header_exit button:hover {
+    border-color: #9099a2;
+    color: #222;
+    background: #f3f5f7;
 }
 .exit-card {
     max-width: 560px;
@@ -188,38 +218,6 @@ section[data-testid="stSidebar"] div[data-testid="stRadio"] label p {
     background: #e8f2ed;
     color: #4d8578;
     font-size: 1.2rem;
-}
-.topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    min-height: 70px;
-    margin-bottom: .95rem;
-    padding: 0 0 .7rem;
-    border-bottom: 1px solid #dfe7e2;
-}
-.topbar-title {
-    color: #244b4b;
-    font-size: 1.08rem;
-    font-weight: 700;
-    letter-spacing: -.2px;
-}
-.topbar-subtitle {
-    margin-top: .12rem;
-    color: #758781;
-    font-size: .76rem;
-}
-.topbar-agency {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-}
-.topbar-logo {
-    display: block;
-    width: 168px;
-    max-height: 52px;
-    object-fit: contain;
 }
 .page-heading {
     margin: .15rem 0 .3rem;
@@ -431,12 +429,83 @@ div[data-testid="stRadio"] label,
 div[data-testid="stSlider"] label { color: #526861; font-weight: 600; }
 @media (max-width: 760px) {
     [data-testid="stMainBlockContainer"] { padding: 3.6rem .85rem .9rem; }
-    .topbar { align-items: flex-start; }
-    .topbar-logo { width: 126px; max-height: 42px; }
     .sidebar-footer { position: static; width: auto; margin-top: 2rem; }
     .st-key-sidebar_exit { position: static; width: auto; }
     .risk-legend-note { width: 100%; margin-left: 0; }
+    .st-key-header_exit { top: 16px; right: 8px; width: 60px; z-index: 1001; }
+    .st-key-header_exit button { min-height: 34px; padding: 0 .45rem; }
 }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown(f"""
+<style>
+header[data-testid="stHeader"] {{
+    height: 82px !important;
+    min-height: 82px;
+    z-index: 1000;
+    background: #fff;
+}}
+header[data-testid="stHeader"] [data-testid="stToolbar"] {{
+    box-sizing: border-box;
+    min-height: 82px;
+    padding: .7rem 1rem;
+    border-bottom: 1px solid #dfe3e8;
+    background: #fff;
+    display: flex;
+    align-items: center;
+}}
+header[data-testid="stHeader"] [data-testid="stToolbar"] > div {{
+    position: absolute;
+    inset: 0;
+    display: block !important;
+    pointer-events: none;
+}}
+header[data-testid="stHeader"] [data-testid="stExpandSidebarButton"] {{
+    position: absolute;
+    top: 27px;
+    left: 8px;
+    z-index: 1002;
+    pointer-events: auto;
+}}
+header[data-testid="stHeader"]:has([data-testid="stExpandSidebarButton"])
+    [data-testid="stToolbar"]::before {{
+    margin-left: 40px;
+}}
+header[data-testid="stHeader"] [data-testid="stToolbar"]::before {{
+    content: "Vigilancia epidemiológica\\A Dengue · Influenza · COVID-19";
+    white-space: pre-line;
+    color: #454545;
+    font: 700 1.08rem/1.35 "Segoe UI", "Aptos", sans-serif;
+}}
+header[data-testid="stHeader"] [data-testid="stToolbar"]::after {{
+    content: "";
+    display: block;
+    flex: 0 0 190px;
+    height: 64px;
+    margin-left: auto;
+    margin-right: 88px;
+    background: url("data:image/png;base64,{LOGO_BASE64}") no-repeat right center / contain;
+}}
+@media (max-width: 760px) {{
+    header[data-testid="stHeader"] {{
+        height: 70px !important;
+        min-height: 70px;
+    }}
+    header[data-testid="stHeader"] [data-testid="stToolbar"] {{
+        min-height: 70px;
+        padding: .55rem .75rem;
+        background: #fff;
+    }}
+    header[data-testid="stHeader"] [data-testid="stToolbar"]::before {{
+        font-size: .88rem;
+    }}
+    header[data-testid="stHeader"] [data-testid="stToolbar"]::after {{
+        flex-basis: 126px;
+        height: 42px;
+        margin-right: 72px;
+    }}
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -487,24 +556,13 @@ else:
         )
         with st.container(key="sidebar_exit"):
             if st.button("Salir", use_container_width=True):
-                if DEMO_MODE:
-                    st.session_state["demo_exit"] = True
-                else:
-                    from api_client import api
-                    api.logout()
+                _salir_del_panel()
                 st.rerun()
 
-    st.markdown(f"""
-    <div class="topbar">
-        <div>
-            <div class="topbar-title">Vigilancia epidemiológica</div>
-            <div class="topbar-subtitle">Dengue · Influenza · COVID-19</div>
-        </div>
-        <div class="topbar-agency">
-            <img class="topbar-logo" src="data:image/png;base64,{LOGO_BASE64}" alt="Secretaría de Salud de Jalisco">
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    with st.container(key="header_exit"):
+        if st.button("Salir", key="header_exit_button", help="Cerrar sesión y salir del panel"):
+            _salir_del_panel()
+            st.rerun()
 
     if seccion == NAV[0]:
         render_resumen_view()
