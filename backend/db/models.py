@@ -108,8 +108,8 @@ class Sintoma(Base):
     dificultad_respiratoria = Column(Boolean, default=False)
     otros_sintomas = Column(Text, nullable=True)
     dias_con_sintomas = Column(Integer, default=1)
+    temperatura = Column(Float, nullable=True)
     sospecha_enfermedad = Column(String(30), nullable=True)  # "dengue", "influenza", "covid"
     synced = Column(Boolean, default=True)
     ts_registro = Column(DateTime, default=datetime.datetime.utcnow)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
-

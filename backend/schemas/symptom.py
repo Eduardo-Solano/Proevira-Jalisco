@@ -15,6 +15,7 @@ class SymptomCreateRequest(BaseModel):
     dificultad_respiratoria: bool = False
     otros_sintomas: Optional[str] = None
     dias_con_sintomas: int = 1
+    temperatura: Optional[float] = Field(None, ge=30.0, le=45.0)
     sospecha_enfermedad: Optional[str] = None
     ts_registro: Optional[datetime] = None
 
@@ -33,6 +34,7 @@ class SymptomResponse(BaseModel):
     dificultad_respiratoria: bool
     otros_sintomas: Optional[str] = None
     dias_con_sintomas: int
+    temperatura: Optional[float] = None
     sospecha_enfermedad: Optional[str] = None
     synced: bool
     ts_registro: datetime
@@ -51,4 +53,3 @@ class SymptomCreateResponse(BaseModel):
     sospecha_sugerida: Optional[str] = None
     recomendacion: str
     disclaimer_medico: str = "Esta aplicación es un asistente orientador y no sustituye el diagnóstico médico profesional (NOM-004-SSA3-2012)."
-

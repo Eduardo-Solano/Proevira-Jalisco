@@ -98,6 +98,7 @@ def register_symptoms(
         dificultad_respiratoria=request.dificultad_respiratoria,
         otros_sintomas=request.otros_sintomas,
         dias_con_sintomas=request.dias_con_sintomas,
+        temperatura=request.temperatura,
         sospecha_enfermedad=sospecha,
         synced=True,
         ts_registro=ts_reg,
@@ -151,4 +152,3 @@ def get_symptom_detail(
         raise HTTPException(status_code=403, detail="No autorizado para ver este registro")
 
     return rec
-
