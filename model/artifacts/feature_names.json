@@ -1,0 +1,25 @@
+{
+  "region": [
+    "rlog_lag0",
+    "rlog_lag1",
+    "rlog_lag2",
+    "rlog_lag3",
+    "rlog_lag4",
+    "rlog_lag5",
+    "rlog_lag6",
+    "rlog_lag7",
+    "rmedia_4s",
+    "rmedia_8s",
+    "rmax_8s",
+    "rtend",
+    "rtend_rel",
+    "rdef_4s",
+    "rtasa_edad_0_14",
+    "rtasa_edad_15_44",
+    "rtasa_edad_45_64",
+    "rtasa_edad_65_mas",
+    "sem_sin",
+    "sem_cos",
+    "enfermedad_cod"
+  ]
+}
