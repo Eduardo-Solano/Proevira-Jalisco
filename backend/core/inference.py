@@ -280,8 +280,9 @@ class InferenceEngine:
             log_pred = float(self.reg_region.predict(features)[0])
             pred_region = max(0.0, float(np.expm1(log_pred)))
             casos_esperados = round(pred_region * share, 2)
+            casos_redondeados = int(np.round(casos_esperados))
             risk_index = min(
-                int(np.searchsorted(thresholds, casos_esperados, side="left")),
+                int(np.searchsorted(thresholds, casos_redondeados, side="left")),
                 len(self.labels) - 1,
             )
             target_date = ref_date + pd.Timedelta(days=7 * offset)
@@ -289,6 +290,7 @@ class InferenceEngine:
             proyeccion.append({
                 "semana": f"{iso.year}-W{iso.week:02d}",
                 "casos": casos_esperados,
+                "casos_redondeados": casos_redondeados,
                 "nivel": self.labels[risk_index],
             })
 
