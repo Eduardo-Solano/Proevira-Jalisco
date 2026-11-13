@@ -20,6 +20,7 @@ def get_mobile_incidence(
     current_user: dict = Depends(get_current_user),
 ):
     """Incidencia histórica agregada para el mapa informativo de pacientes."""
+    inference_engine.load()
     enfermedad = enfermedad.strip().lower()
     if enfermedad not in {"dengue", "influenza", "covid"}:
         raise HTTPException(
@@ -74,7 +75,7 @@ def get_mobile_incidence(
     points = []
     for row in grouped.to_dict("records"):
         municipio_id = str(row["municipio_id"]).zfill(5)
-        info = inference_engine.municipios_coords.get(municipio_id, {})
+        info = inference_engine.municipios_info.get(municipio_id, {})
         nombre = info.get("nombre") or row.get("municipio") or municipio_id
         points.append(
             {

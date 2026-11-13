@@ -18,6 +18,7 @@
         "path",
         "shared_preferences",
         "sqflite",
+        "timezone",
         "url_launcher",
         "uuid",
         "web_socket_channel"
@@ -83,6 +84,13 @@
       "dependencies": [
         "crypto",
         "fixnum"
+      ]
+    },
+    {
+      "name": "timezone",
+      "version": "0.9.4",
+      "dependencies": [
+        "path"
       ]
     },
     {
@@ -265,7 +273,7 @@
     },
     {
       "name": "matcher",
-      "version": "0.12.19",
+      "version": "0.12.17",
       "dependencies": [
         "async",
         "meta",
@@ -276,7 +284,7 @@
     },
     {
       "name": "test_api",
-      "version": "0.7.10",
+      "version": "0.7.7",
       "dependencies": [
         "async",
         "boolean_selector",
@@ -548,13 +556,6 @@
       ]
     },
     {
-      "name": "timezone",
-      "version": "0.9.4",
-      "dependencies": [
-        "path"
-      ]
-    },
-    {
       "name": "flutter_local_notifications_platform_interface",
       "version": "7.2.0",
       "dependencies": [
@@ -641,14 +642,14 @@
     },
     {
       "name": "material_color_utilities",
-      "version": "0.13.0",
+      "version": "0.11.1",
       "dependencies": [
         "collection"
       ]
     },
     {
       "name": "characters",
-      "version": "1.4.1",
+      "version": "1.4.0",
       "dependencies": []
     },
     {
