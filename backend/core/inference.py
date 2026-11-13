@@ -414,5 +414,75 @@ class InferenceEngine:
             "prediccion": prediccion,
         }
 
+    def get_region_history(
+        self,
+        enfermedad: str = "dengue",
+        semanas: int = 12,
+        horizonte: int = 4,
+    ) -> Dict[str, Any]:
+        """Agrega el histórico y las proyecciones municipales de la Región Centro."""
+        if not self.loaded:
+            self.load()
+
+        enf = self._normalize_enfermedad(enfermedad)
+        if self.raw_data is None:
+            return {
+                "region": "Centro",
+                "enfermedad": enf,
+                "municipios_incluidos": 0,
+                "historico": [],
+                "prediccion": [],
+            }
+
+        region_data = self.raw_data[self.raw_data["enfermedad"] == enf]
+        if region_data.empty:
+            return {
+                "region": "Centro",
+                "enfermedad": enf,
+                "municipios_incluidos": 0,
+                "historico": [],
+                "prediccion": [],
+            }
+
+        history_rows = (
+            region_data.groupby(["semana", "fecha_inicio_semana"], as_index=False)["casos"]
+            .sum()
+            .sort_values("fecha_inicio_semana")
+            .tail(semanas)
+        )
+        historico = [
+            {"semana": str(row["semana"]), "casos": int(round(float(row["casos"])))}
+            for _, row in history_rows.iterrows()
+        ]
+
+        municipios = sorted(region_data["municipio_id"].astype(str).unique())
+        forecast_totals: Dict[str, float] = {}
+        municipios_con_datos = 0
+        for municipio_id in municipios:
+            history = self.get_history(
+                municipio_id,
+                enfermedad=enf,
+                semanas=semanas,
+                horizonte=horizonte,
+            )
+            if not history["historico"]:
+                continue
+            municipios_con_datos += 1
+            for point in history["prediccion"]:
+                semana = point["semana"]
+                forecast_totals[semana] = forecast_totals.get(semana, 0.0) + float(point["casos"])
+
+        prediccion = [
+            {"semana": semana, "casos": round(casos, 2)}
+            for semana, casos in sorted(forecast_totals.items(), key=lambda item: _iso_to_monday(item[0]))
+        ]
+        return {
+            "region": "Centro",
+            "enfermedad": enf,
+            "municipios_incluidos": municipios_con_datos,
+            "historico": historico,
+            "prediccion": prediccion,
+        }
+
 
 inference_engine = InferenceEngine()

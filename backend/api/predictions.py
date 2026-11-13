@@ -9,6 +9,7 @@ from backend.schemas.prediction import (
     PredictionResponse,
     BulkPredictionItem,
     PredictionHistoryResponse,
+    RegionPredictionHistoryResponse,
     ExplainResponse,
     FeatureImportanceItem,
     ShapFeature
@@ -103,6 +104,22 @@ def get_predictions_history(
         horizonte=horizonte,
     )
     return PredictionHistoryResponse(**res)
+
+
+@router.get("/history/region", response_model=RegionPredictionHistoryResponse)
+def get_region_predictions_history(
+    enfermedad: str = Query("dengue", description="dengue, influenza o covid"),
+    semanas: int = Query(4, ge=4, le=52),
+    horizonte: int = Query(4, ge=1, le=4, description="Número de semanas a proyectar"),
+    current_user: dict = Depends(require_roles(["funcionario", "medico"])),
+):
+    """Histórico y proyección agregados para los municipios de la Región Centro."""
+    res = inference_engine.get_region_history(
+        enfermedad=enfermedad,
+        semanas=semanas,
+        horizonte=horizonte,
+    )
+    return RegionPredictionHistoryResponse(**res)
 
 
 @router.get("/explain", response_model=ExplainResponse)

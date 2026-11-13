@@ -77,4 +77,6 @@ async def on_startup():
                 connection.execute(
                     text("ALTER TABLE sintomas ADD COLUMN temperatura FLOAT")
                 )
+    from backend.db.models import AlertaPredictivaBorrador
+    AlertaPredictivaBorrador.__table__.create(bind=engine, checkfirst=True)
     logger.info(f"API Documentación disponible en /docs")

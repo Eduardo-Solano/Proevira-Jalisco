@@ -3,17 +3,39 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, HTTPException, status, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from backend.db.database import get_db
-from backend.db.models import Alerta
+from backend.db.models import Alerta, AlertaPredictivaBorrador
 from backend.schemas.alert import (
     AlertResponse,
     AlertCreateRequest,
     AlertCreateResponse,
-    AlertPatchRequest
+    AlertPatchRequest,
+    PredictiveAlertDraftResponse,
+    PredictiveAlertDraftReviewRequest,
 )
 from backend.ws.manager import manager
 from backend.core.security import require_roles, decode_token
+from backend.core.inference import inference_engine
 
 router = APIRouter(tags=["Alertas"])
+NIVELES_ALERTA_PREDICTIVA = {"medio", "alto", "crítico"}
+
+
+def _utcnow_naive() -> datetime.datetime:
+    return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+
+
+def _borrador_response(borrador: AlertaPredictivaBorrador) -> PredictiveAlertDraftResponse:
+    return PredictiveAlertDraftResponse(
+        id=borrador.id,
+        municipio=borrador.municipio_id,
+        semana=borrador.semana,
+        enfermedad=borrador.enfermedad,
+        nivel=borrador.nivel,
+        casos_esperados=borrador.casos_esperados,
+        mensaje=borrador.mensaje,
+        estado=borrador.estado,
+        created_at=borrador.created_at,
+    )
 
 
 @router.get("/alerts", response_model=List[AlertResponse])
@@ -69,7 +91,7 @@ async def create_alert(
         nivel=request.nivel,
         mensaje=request.mensaje,
         activa=True,
-        created_at=datetime.datetime.utcnow()
+        created_at=_utcnow_naive()
     )
     db.add(nueva)
     db.commit()
@@ -101,6 +123,200 @@ async def create_alert(
         mensaje="Alerta creada y transmitida por WebSocket en tiempo real",
         alerta=alerta_resp
     )
+
+
+@router.post("/alerts/predictive-drafts/generate")
+def generate_predictive_alert_drafts(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_roles(["funcionario"])),
+):
+    """Genera borradores idempotentes para proyecciones municipales de riesgo medio o mayor."""
+    inference_engine.load()
+    municipios = sorted(inference_engine.municipios_info)
+    if len(municipios) != 12:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Se esperaban 12 municipios de la Región Centro; se encontraron {len(municipios)}.",
+        )
+
+    forecast_weeks = {}
+    eligible_forecasts = {}
+    evaluated_pairs = 0
+
+    for enfermedad in ("dengue", "influenza", "covid"):
+        for municipio_id in municipios:
+            history = inference_engine.get_history(
+                municipio_id,
+                enfermedad=enfermedad,
+                semanas=4,
+                horizonte=4,
+            )
+            points = history["prediccion"]
+            if not points:
+                continue
+
+            evaluated_pairs += 1
+            pair = (municipio_id, enfermedad)
+            forecast_weeks[pair] = {point["semana"] for point in points}
+            for point in points:
+                if point["nivel"].lower() not in NIVELES_ALERTA_PREDICTIVA:
+                    continue
+                eligible_forecasts[(municipio_id, enfermedad, point["semana"])] = point
+
+    if evaluated_pairs != len(municipios) * 3:
+        raise HTTPException(
+            status_code=503,
+            detail="No se pudieron calcular proyecciones para los 12 municipios y las 3 enfermedades.",
+        )
+
+    created = 0
+    updated = 0
+    obsolete = 0
+    for (municipio_id, enfermedad), weeks in forecast_weeks.items():
+        pending = db.query(AlertaPredictivaBorrador).filter(
+            AlertaPredictivaBorrador.municipio_id == municipio_id,
+            AlertaPredictivaBorrador.enfermedad == enfermedad,
+            AlertaPredictivaBorrador.estado == "pendiente",
+        ).all()
+        for draft in pending:
+            if draft.semana not in weeks or (municipio_id, enfermedad, draft.semana) not in eligible_forecasts:
+                draft.estado = "obsoleta"
+                draft.reviewed_at = _utcnow_naive()
+                draft.reviewed_by = None
+                obsolete += 1
+
+    for key, point in eligible_forecasts.items():
+        municipio_id, enfermedad, semana = key
+        fecha_semana = datetime.date.fromisocalendar(
+            int(semana[:4]), int(semana[-2:]), 1
+        ).strftime("%d/%m/%Y")
+        mensaje = (
+            f"Proyección para la semana que inicia el {fecha_semana}: "
+            f"{point['casos']:.1f} casos estimados de {enfermedad}. "
+            "Borrador predictivo; requiere revisión de un funcionario y no representa "
+            "una alerta oficial ni casos confirmados."
+        )
+        draft = db.query(AlertaPredictivaBorrador).filter(
+            AlertaPredictivaBorrador.municipio_id == municipio_id,
+            AlertaPredictivaBorrador.enfermedad == enfermedad,
+            AlertaPredictivaBorrador.semana == semana,
+        ).first()
+
+        if draft is None:
+            db.add(
+                AlertaPredictivaBorrador(
+                    municipio_id=municipio_id,
+                    enfermedad=enfermedad,
+                    semana=semana,
+                    nivel=point["nivel"],
+                    casos_esperados=point["casos"],
+                    mensaje=mensaje,
+                    estado="pendiente",
+                )
+            )
+            created += 1
+        elif draft.estado == "pendiente":
+            if (
+                draft.nivel != point["nivel"]
+                or abs(float(draft.casos_esperados) - float(point["casos"])) >= 0.01
+                or draft.mensaje != mensaje
+            ):
+                draft.nivel = point["nivel"]
+                draft.casos_esperados = point["casos"]
+                draft.mensaje = mensaje
+                updated += 1
+
+    db.commit()
+    return {
+        "municipios_evaluados": len(municipios),
+        "borradores_creados": created,
+        "borradores_actualizados": updated,
+        "borradores_obsoletos": obsolete,
+    }
+
+
+@router.get(
+    "/alerts/predictive-drafts",
+    response_model=List[PredictiveAlertDraftResponse],
+)
+def get_predictive_alert_drafts(
+    municipio: Optional[str] = Query(None, description="Filtrar por municipio"),
+    estado: str = Query("pendiente"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_roles(["funcionario"])),
+):
+    if estado not in {"pendiente", "aprobada", "descartada", "obsoleta"}:
+        raise HTTPException(status_code=400, detail="Estado de borrador no válido")
+
+    query = db.query(AlertaPredictivaBorrador).filter(
+        AlertaPredictivaBorrador.estado == estado
+    )
+    if municipio:
+        municipio_id = f"14{municipio}" if len(municipio) == 3 else municipio
+        query = query.filter(AlertaPredictivaBorrador.municipio_id == municipio_id)
+
+    drafts = query.order_by(
+        AlertaPredictivaBorrador.semana.asc(),
+        AlertaPredictivaBorrador.nivel.desc(),
+        AlertaPredictivaBorrador.id.asc(),
+    ).all()
+    return [_borrador_response(draft) for draft in drafts]
+
+
+@router.patch(
+    "/alerts/predictive-drafts/{draft_id}",
+    response_model=PredictiveAlertDraftResponse,
+)
+async def review_predictive_alert_draft(
+    draft_id: int,
+    request: PredictiveAlertDraftReviewRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_roles(["funcionario"])),
+):
+    if request.decision not in {"aprobar", "descartar"}:
+        raise HTTPException(status_code=400, detail="La decisión debe ser 'aprobar' o 'descartar'")
+
+    draft = db.query(AlertaPredictivaBorrador).filter(
+        AlertaPredictivaBorrador.id == draft_id
+    ).first()
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Borrador predictivo no encontrado")
+    if draft.estado != "pendiente":
+        raise HTTPException(status_code=409, detail="El borrador ya fue revisado")
+
+    draft.estado = "aprobada" if request.decision == "aprobar" else "descartada"
+    draft.reviewed_at = _utcnow_naive()
+    draft.reviewed_by = current_user.get("uid") or current_user.get("email")
+
+    alerta = None
+    if request.decision == "aprobar":
+        alerta = Alerta(
+            municipio_id=draft.municipio_id,
+            nivel=draft.nivel,
+            mensaje=draft.mensaje,
+            activa=True,
+            created_at=_utcnow_naive(),
+        )
+        db.add(alerta)
+        db.flush()
+        draft.alerta_id = alerta.id
+
+    db.commit()
+    db.refresh(draft)
+
+    if alerta is not None:
+        await manager.broadcast(
+            {
+                "tipo": "alerta",
+                "id": alerta.id,
+                "municipio": alerta.municipio_id,
+                "nivel": alerta.nivel,
+                "mensaje": alerta.mensaje,
+                "ts": alerta.created_at.isoformat(),
+            }
+        )
+
+    return _borrador_response(draft)
 
 
 @router.patch("/alerts/{alert_id}")

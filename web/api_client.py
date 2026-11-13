@@ -1,6 +1,9 @@
 """Cliente para la API de FastAPI y datos explícitos de demostración."""
 
+import copy
+import hashlib
 import os
+import time
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -46,6 +49,10 @@ class ApiClient:
         return headers
 
     @staticmethod
+    def _clear_read_cache() -> None:
+        st.session_state.pop("_api_read_cache", None)
+
+    @staticmethod
     def _enfermedad_api(enfermedad: str) -> str:
         return ENFERMEDADES_API.get(enfermedad.lower(), enfermedad.lower())
 
@@ -59,6 +66,25 @@ class ApiClient:
         headers: Optional[Dict[str, str]] = None,
         root_path: bool = False,
     ) -> Any:
+        method_upper = method.upper()
+        cache = None
+        cache_key = None
+        cache_ttl = 45
+        if method_upper == "GET":
+            cache = st.session_state.setdefault("_api_read_cache", {})
+            params_key = tuple(sorted((str(key), str(value)) for key, value in (params or {}).items()))
+            token = st.session_state.get("auth_token", "")
+            token_key = hashlib.sha256(token.encode("utf-8")).hexdigest() if token else ""
+            cache_key = (self.base_url, root_path, path, params_key, token_key)
+            if path in {"/version", "/model/metrics"}:
+                cache_ttl = 300
+            elif path.startswith("/alerts"):
+                cache_ttl = 15
+
+            cached = cache.get(cache_key)
+            if cached and time.monotonic() - cached[0] < cache_ttl:
+                return copy.deepcopy(cached[1])
+
         url = f"{self.root_url if root_path else self.base_url}/{path.lstrip('/')}"
         try:
             response = requests.request(
@@ -82,11 +108,22 @@ class ApiClient:
             raise ApiError(f"API {response.status_code} en {path}: {detail}")
 
         if response.status_code == 204 or not response.content:
-            return None
-        try:
-            return response.json()
-        except ValueError as error:
-            raise ApiError(f"La API devolvió una respuesta JSON inválida en {path}.") from error
+            result = None
+        else:
+            try:
+                result = response.json()
+            except ValueError as error:
+                raise ApiError(f"La API devolvió una respuesta JSON inválida en {path}.") from error
+
+        if cache is not None and cache_key is not None:
+            cache[cache_key] = (time.monotonic(), copy.deepcopy(result))
+            if len(cache) > 128:
+                oldest_key = min(cache, key=lambda key: cache[key][0])
+                del cache[oldest_key]
+        elif method_upper in {"POST", "PATCH", "PUT", "DELETE"}:
+            self._clear_read_cache()
+
+        return result
 
     def check_health(self) -> bool:
         if DEMO_MODE:
@@ -117,6 +154,8 @@ class ApiClient:
         st.session_state["user_email"] = data.get("email", email)
         st.session_state["user_uid"] = data.get("uid")
         st.session_state["municipio_id"] = data.get("municipio_id")
+        st.session_state.pop("_predictive_drafts_auto_attempted", None)
+        st.session_state.pop("_predictive_drafts_generation_error", None)
         return {"success": True, "data": data}
 
     def register_medico(self, email: str, password: str, institucion: str, cedula: str) -> Dict[str, Any]:
@@ -134,7 +173,17 @@ class ApiClient:
             return {"success": False, "error": str(error)}
 
     def logout(self) -> None:
-        for key in ("auth_token", "user_role", "user_email", "user_uid", "municipio_id", "backend_offline"):
+        self._clear_read_cache()
+        for key in (
+            "auth_token",
+            "user_role",
+            "user_email",
+            "user_uid",
+            "municipio_id",
+            "backend_offline",
+            "_predictive_drafts_auto_attempted",
+            "_predictive_drafts_generation_error",
+        ):
             st.session_state.pop(key, None)
 
     def get_kpis(self) -> Dict[str, Any]:
@@ -288,6 +337,56 @@ class ApiClient:
             },
         )
 
+    def get_region_prediction_history(
+        self,
+        enfermedad: str = "dengue",
+        semanas: int = 4,
+        horizonte: int = 4,
+    ) -> Dict[str, Any]:
+        enfermedad_api = self._enfermedad_api(enfermedad)
+        if DEMO_MODE:
+            historico_por_semana: Dict[str, int] = {}
+            prediccion_por_semana: Dict[str, float] = {}
+            for municipio_id in MUNICIPIOS_JALISCO:
+                data = self.get_prediction_history(
+                    municipio_id,
+                    enfermedad=enfermedad_api,
+                    semanas=semanas,
+                    horizonte=horizonte,
+                )
+                for point in data["historico"]:
+                    historico_por_semana[point["semana"]] = (
+                        historico_por_semana.get(point["semana"], 0) + int(point["casos"])
+                    )
+                for point in data["prediccion"]:
+                    prediccion_por_semana[point["semana"]] = (
+                        prediccion_por_semana.get(point["semana"], 0.0) + float(point["casos"])
+                    )
+
+            return {
+                "region": "Centro",
+                "enfermedad": enfermedad_api,
+                "municipios_incluidos": len(MUNICIPIOS_JALISCO),
+                "historico": [
+                    {"semana": semana, "casos": casos}
+                    for semana, casos in sorted(historico_por_semana.items())[-semanas:]
+                ],
+                "prediccion": [
+                    {"semana": semana, "casos": round(casos, 2)}
+                    for semana, casos in sorted(prediccion_por_semana.items())[:horizonte]
+                ],
+            }
+
+        return self._request(
+            "GET",
+            "/predictions/history/region",
+            params={
+                "enfermedad": enfermedad_api,
+                "semanas": semanas,
+                "horizonte": horizonte,
+            },
+        )
+
     def get_prediction_explain(
         self,
         municipio_id: str,
@@ -357,6 +456,39 @@ class ApiClient:
             }
             for alert in alerts
         ]
+
+    def generate_predicted_alert_drafts(self) -> Dict[str, Any]:
+        if DEMO_MODE:
+            return {
+                "success": False,
+                "error": "La generación de borradores requiere el backend conectado.",
+            }
+        try:
+            data = self._request("POST", "/alerts/predictive-drafts/generate")
+            return {"success": True, "data": data}
+        except ApiError as error:
+            return {"success": False, "error": str(error)}
+
+    def get_predicted_alert_drafts(self, municipio_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        if DEMO_MODE:
+            raise ApiError("Los borradores predictivos no están disponibles en modo de demostración.")
+        params = {"estado": "pendiente"}
+        if municipio_id:
+            params["municipio"] = municipio_id
+        return self._request("GET", "/alerts/predictive-drafts", params=params)
+
+    def review_predicted_alert_draft(self, draft_id: int, decision: str) -> Dict[str, Any]:
+        if DEMO_MODE:
+            return {"success": False, "error": "El modo demostración no guarda ni publica alertas."}
+        try:
+            data = self._request(
+                "PATCH",
+                f"/alerts/predictive-drafts/{draft_id}",
+                json={"decision": decision},
+            )
+            return {"success": True, "data": data}
+        except ApiError as error:
+            return {"success": False, "error": str(error)}
 
     def create_alert(self, municipio_id: str, nivel: str, mensaje: str) -> Dict[str, Any]:
         if DEMO_MODE:

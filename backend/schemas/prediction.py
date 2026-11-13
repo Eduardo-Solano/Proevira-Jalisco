@@ -51,6 +51,19 @@ class PredictionHistoryResponse(BaseModel):
     prediccion: List[ForecastPoint]
 
 
+class RegionForecastPoint(BaseModel):
+    semana: str
+    casos: float
+
+
+class RegionPredictionHistoryResponse(BaseModel):
+    region: str
+    enfermedad: str
+    municipios_incluidos: int
+    historico: List[HistoryPoint]
+    prediccion: List[RegionForecastPoint]
+
+
 class FeatureImportanceItem(BaseModel):
     feature: str
     shap: float
