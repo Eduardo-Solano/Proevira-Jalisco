@@ -15,6 +15,7 @@ class HomePaciente extends StatefulWidget {
     required this.database,
     required this.socket,
     required this.onLogout,
+    this.municipioId,
     super.key,
   });
 
@@ -22,6 +23,7 @@ class HomePaciente extends StatefulWidget {
   final DatabaseHelper database;
   final AlertsSocket socket;
   final Future<void> Function() onLogout;
+  final String? municipioId;
 
   @override
   State<HomePaciente> createState() => _HomePacienteState();
@@ -34,7 +36,10 @@ class _HomePacienteState extends State<HomePaciente> {
   Widget build(BuildContext context) {
     final pages = [
       AlertasScreen(
-          api: widget.api, database: widget.database, socket: widget.socket),
+          api: widget.api,
+          database: widget.database,
+          socket: widget.socket,
+          municipioId: widget.municipioId),
       SeguimientoSintomas(api: widget.api, database: widget.database),
       MapaClues(api: widget.api, database: widget.database),
       const InformacionScreen(),

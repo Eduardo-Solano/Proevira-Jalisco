@@ -64,6 +64,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextFormField(
                         controller: email,
                         keyboardType: TextInputType.emailAddress,
+                        spellCheckConfiguration:
+                            const SpellCheckConfiguration.disabled(),
                         decoration: const InputDecoration(
                           labelText: 'Correo electrónico',
                           prefixIcon: Icon(Icons.email_outlined),
@@ -78,6 +80,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextFormField(
                         controller: password,
                         obscureText: true,
+                        spellCheckConfiguration:
+                            const SpellCheckConfiguration.disabled(),
                         decoration: const InputDecoration(
                           labelText: 'Contraseña',
                           prefixIcon: Icon(Icons.lock_outline),
