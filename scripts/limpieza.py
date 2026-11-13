@@ -1,9 +1,9 @@
-"""Limpieza batch: CSV limpios por fuente -> artefactos consolidados en data/clean/.
+"""Limpieza batch: CSV limpios por fuente -> CSV unificado sin pérdidas en data/clean/.
 
 Salidas:
-  data/clean/casos_municipio_semana.parquet  (municipio_id, municipio, semana, enfermedad, casos, grupos de edad, ...)
-  data/clean/clues.csv                       (catálogo CLUES de Jalisco con horario)
-  data/clean/municipios.geojson              (centroides de municipios, derivados de CLUES)
+  data/clean/casos_municipio_semana.csv  (municipio_id, municipio, enfermedad, fecha_inicio_semana, anio, sem, semana, casos, defunciones, grupos de edad)
+  data/clean/clues.csv                   (catálogo CLUES de la Región Centro con horario)
+  data/clean/municipios.geojson          (centroides de los 12 municipios, derivados de CLUES)
 
 Uso: python scripts/limpieza.py
 """
@@ -16,7 +16,7 @@ import pandas as pd
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CLEAN = os.path.join(ROOT, "data", "clean")
 CONFIRMADO = {"1", "2", "3"}  # 1-3 = confirmado (asociación/dictamen/laboratorio)
-# Región Centro de Jalisco: 12 municipios. 002 (Acatic) y 114 (Zapotlanejo) no pertenecen y se excluyen.
+# Región Centro de Jalisco: 12 municipios. 002 (Acatic) y 114 (no pertenece) se excluyen.
 EXCLUIR = {"14002", "14114"}
 GRUPOS = [(0, 14, "edad_0_14"), (15, 44, "edad_15_44"), (45, 64, "edad_45_64"), (65, 200, "edad_65_mas")]
 
@@ -51,7 +51,7 @@ def eventos_covid_flu() -> pd.DataFrame:
         "edad": pd.to_numeric(c["EDAD"], errors="coerce"),
         "defuncion": 0,
     })
-    # Formato antiguo (2020-2022): CLASIFICACION_FINAL = COVID. Formato nuevo: columnas COVID/FLU.
+    # Formato 2020-2023: CLASIFICACION_FINAL = COVID. Formato 2024+: CLASIFICACION_FINAL_COVID / CLASIFICACION_FINAL_FLU.
     covid = c["CLASIFICACION_FINAL_COVID"].fillna(c["CLASIFICACION_FINAL"]).isin(CONFIRMADO)
     flu = c["CLASIFICACION_FINAL_FLU"].isin(CONFIRMADO)
     return pd.concat([
@@ -63,35 +63,53 @@ def eventos_covid_flu() -> pd.DataFrame:
 def casos_municipio_semana() -> pd.DataFrame:
     ev = pd.concat([eventos_dengue(), eventos_covid_flu()], ignore_index=True)
     ev = ev.dropna(subset=["fecha"])
-    ev = ev[~ev["municipio_id"].isin(EXCLUIR)]
-    ev = ev[(ev["edad"].isna()) | ((ev["edad"] >= 0) & (ev["edad"] <= 110))]
-    iso = ev["fecha"].dt.isocalendar()
-    ev["anio"], ev["sem"] = iso["year"].astype(int), iso["week"].astype(int)
-    ev["semana"] = ev["anio"].astype(str) + "-W" + ev["sem"].astype(str).str.zfill(2)
+    ev = ev[~ev["municipio_id"].isin(EXCLUIR)].copy()
+
+    # Alinear exactamente cada fecha al lunes de su semana ISO (evita perder casos de la semana 1)
+    ev["fecha_inicio_semana"] = ev["fecha"].dt.normalize() - pd.to_timedelta(ev["fecha"].dt.day_of_week, unit="D")
     for lo, hi, name in GRUPOS:
         ev[name] = ev["edad"].between(lo, hi).astype(int)
 
     nombres = ev.groupby("municipio_id")["municipio"].agg(lambda s: s.mode().iat[0])
-    agg = ev.groupby(["municipio_id", "enfermedad", "anio", "sem", "semana"], as_index=False).agg(
-        casos=("fecha", "size"), defunciones=("defuncion", "sum"),
-        **{n: (n, "sum") for _, _, n in GRUPOS})
 
-    # Rejilla completa municipio x enfermedad x semana (ceros explícitos para series de tiempo)
-    lunes = pd.date_range(ev["fecha"].min().normalize(), ev["fecha"].max().normalize(), freq="W-MON")
-    semanas = pd.DataFrame({"fecha": lunes})
-    iso = semanas["fecha"].dt.isocalendar()
-    semanas["anio"], semanas["sem"] = iso["year"].astype(int), iso["week"].astype(int)
-    semanas["semana"] = semanas["anio"].astype(str) + "-W" + semanas["sem"].astype(str).str.zfill(2)
-    semanas = semanas.drop_duplicates("semana")
-    grid = (pd.MultiIndex.from_product([nombres.index, ["dengue", "influenza", "covid"]],
-                                       names=["municipio_id", "enfermedad"]).to_frame(index=False)
-            .merge(semanas, how="cross"))
-    out = grid.merge(agg, on=["municipio_id", "enfermedad", "anio", "sem", "semana"], how="left")
+    # Construir rejilla semanal por cada enfermedad usando SU PROPIO rango real de fechas
+    # (evita inyectar años de ceros artificiales en Influenza 2020-2023 o semanas futuras sin corte en Dengue)
+    partes = []
     cols = ["casos", "defunciones"] + [n for _, _, n in GRUPOS]
-    out[cols] = out[cols].fillna(0).astype(int)
-    out["municipio"] = out["municipio_id"].map(nombres)
-    return out.rename(columns={"fecha": "fecha_inicio_semana"}).sort_values(
-        ["municipio_id", "enfermedad", "fecha_inicio_semana"]).reset_index(drop=True)
+    for enf, sub in ev.groupby("enfermedad"):
+        agg = sub.groupby(["municipio_id", "enfermedad", "fecha_inicio_semana"], as_index=False).agg(
+            casos=("fecha", "size"),
+            defunciones=("defuncion", "sum"),
+            **{n: (n, "sum") for _, _, n in GRUPOS},
+        )
+        lunes = pd.date_range(sub["fecha_inicio_semana"].min(), sub["fecha_inicio_semana"].max(), freq="W-MON")
+        semanas = pd.DataFrame({"fecha_inicio_semana": lunes})
+        iso = semanas["fecha_inicio_semana"].dt.isocalendar()
+        semanas["anio"] = iso["year"].astype(int)
+        semanas["sem"] = iso["week"].astype(int)
+        semanas["semana"] = semanas["anio"].astype(str) + "-W" + semanas["sem"].astype(str).str.zfill(2)
+
+        grid = (
+            pd.MultiIndex.from_product([nombres.index, [enf]], names=["municipio_id", "enfermedad"])
+            .to_frame(index=False)
+            .merge(semanas, how="cross")
+        )
+        merged = grid.merge(agg, on=["municipio_id", "enfermedad", "fecha_inicio_semana"], how="left")
+        merged[cols] = merged[cols].fillna(0).astype(int)
+        merged["municipio"] = merged["municipio_id"].map(nombres)
+        partes.append(merged)
+
+    out = pd.concat(partes, ignore_index=True)
+    columnas_orden = [
+        "municipio_id", "municipio", "enfermedad",
+        "fecha_inicio_semana", "anio", "sem", "semana",
+        "casos", "defunciones",
+    ] + [n for _, _, n in GRUPOS]
+    return (
+        out[columnas_orden]
+        .sort_values(["municipio_id", "enfermedad", "fecha_inicio_semana"])
+        .reset_index(drop=True)
+    )
 
 
 def horario_texto(h: pd.DataFrame) -> pd.Series:
@@ -154,17 +172,23 @@ def municipios_geojson(cl: pd.DataFrame, casos: pd.DataFrame) -> dict:
 
 def main():
     casos = casos_municipio_semana()
-    casos.to_parquet(os.path.join(CLEAN, "casos_municipio_semana.parquet"), index=False)
+    csv_out = os.path.join(CLEAN, "casos_municipio_semana.csv")
+    casos.to_csv(csv_out, index=False, encoding="utf-8-sig")
+
+    # Eliminar el parquet antiguo para evitar incongruencias entre fuentes
+    old_parquet = os.path.join(CLEAN, "casos_municipio_semana.parquet")
+    if os.path.exists(old_parquet):
+        os.remove(old_parquet)
+
     cl = clues()
     cl.to_csv(os.path.join(CLEAN, "clues.csv"), index=False)
     with open(os.path.join(CLEAN, "municipios.geojson"), "w", encoding="utf-8") as f:
         json.dump(municipios_geojson(cl, casos), f, ensure_ascii=False)
-    print(f"casos_municipio_semana: {len(casos)} filas, {casos['semana'].nunique()} semanas, "
-          f"{casos['municipio_id'].nunique()} municipios")
-    print(casos.groupby("enfermedad")["casos"].sum().to_string())
+    print(f"casos_municipio_semana.csv: {len(casos)} filas, {casos['municipio_id'].nunique()} municipios")
+    for enf, g in casos.groupby("enfermedad"):
+        print(f"  {enf:10s}: {g['casos'].sum():6d} casos | {g['semana'].min()} -> {g['semana'].max()} ({g['semana'].nunique()} sem)")
     print(f"clues: {len(cl)} unidades en operación con coordenadas válidas")
 
 
 if __name__ == "__main__":
     main()
-

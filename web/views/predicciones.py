@@ -100,37 +100,41 @@ def render_predicciones_view():
 
     # ── Métricas disponibles ──
     st.markdown("#### Evaluación del modelo")
-    disease_key = "covid" if enf == "covid-19" else enf
-    test_metrics = (
+    disease_key = "covid" if enf in ("covid-19", "covid") else enf
+    disease_block = (
         metricas_modelo.get("test", {})
         .get("municipal", {})
         .get(disease_key, {})
-        .get("reparto", {})
         if metricas_modelo
         else {}
     )
-    muestras_evaluacion = (
-        metricas_modelo.get("test", {}).get("municipal", {}).get(disease_key, {}).get("n")
-        if metricas_modelo
-        else None
-    )
-    metric_cols = st.columns(4)
+    test_metrics = disease_block.get("rf", disease_block.get("reparto", {}))
+    muestras_evaluacion = disease_block.get("n")
+    metric_cols = st.columns(5)
     metric_cols[0].metric("MAE", f"{test_metrics['mae']:.3f}" if "mae" in test_metrics else "No disponible")
     metric_cols[1].metric("RMSE", f"{test_metrics['rmse']:.3f}" if "rmse" in test_metrics else "No disponible")
-    metric_cols[2].metric("F1 macro", f"{test_metrics['f1_macro']:.3f}" if "f1_macro" in test_metrics else "No disponible")
-    metric_cols[3].metric(
+    metric_cols[2].metric(
+        "Exactitud riesgo",
+        f"{test_metrics['exactitud']*100:.1f}%" if "exactitud" in test_metrics else "No disponible",
+    )
+    metric_cols[3].metric("F1 macro", f"{test_metrics['f1_macro']:.3f}" if "f1_macro" in test_metrics else "No disponible")
+    metric_cols[4].metric(
         "Muestras de evaluación",
         f"{muestras_evaluacion:,}" if muestras_evaluacion is not None else "No disponible",
     )
     split = metricas_modelo.get("split", {}) if metricas_modelo else {}
+    corte = split.get("por_enfermedad", {}).get(disease_key, {}).get("corte_test") or split.get("corte_test", "No disponible")
     st.caption(
-        f"Métricas de reparto municipal en el conjunto de prueba; corte temporal: "
-        f"{split.get('corte_test', 'No disponible')}. No se generan escenarios ni intervalos de confianza."
+        f"Métricas del modelo municipal directo ({disease_key.upper()}) en el conjunto de prueba; corte temporal: "
+        f"{corte}."
     )
 
     # ── SHAP ──
     st.markdown("#### Factores explicativos (SHAP)")
-    st.caption("Importancia global de las variables del modelo; el servicio no devuelve el efecto local de cada variable.")
+    st.caption(
+        f"Contribución SHAP local sobre log1p(casos) para {MUNICIPIOS_JALISCO[mun]['nombre']} "
+        f"(valor base: {shap_data.get('base_value', 0.0):.3f})."
+    )
 
     col_chart, col_info = st.columns([3, 2])
 
@@ -140,16 +144,17 @@ def render_predicciones_view():
         if df_shap.empty:
             st.info("No hay importancias SHAP disponibles para mostrar.")
         else:
+            df_shap["efecto"] = df_shap["shap"].apply(lambda v: "Aumenta" if v >= 0 else "Reduce")
             fig_s = px.bar(
                 df_shap.sort_values("shap", ascending=True),
                 x="shap", y="feature", orientation="h",
-                labels={"shap": "Importancia global SHAP", "feature": ""},
-                color_discrete_sequence=["#4e9577"],
+                color="efecto",
+                color_discrete_map={"Aumenta": "#b54755", "Reduce": "#4e9577"},
+                labels={"shap": "Impacto SHAP (log1p casos)", "feature": "", "efecto": ""},
             )
             fig_s.update_layout(
                 template="plotly_white", height=320,
                 margin=dict(l=10, r=10, t=10, b=10),
-                showlegend=False,
             )
             st.plotly_chart(fig_s, use_container_width=True)
 
@@ -162,4 +167,4 @@ def render_predicciones_view():
             st.metric("Casos esperados (proyección)", f"{float(forecast['casos']):,.1f}")
             if "nivel" in forecast:
                 st.metric("Nivel de riesgo proyectado", str(forecast["nivel"]).capitalize())
-            st.caption("La importancia global SHAP no indica por sí sola si una variable aumenta o reduce el riesgo.")
+            st.caption("Valores positivos empujan el pronóstico al alza; valores negativos lo atenúan respecto al promedio base.")

@@ -31,7 +31,7 @@ def _reporte(tipo: str, enfermedad: str, municipio: str | None, periodo: str) ->
         resultado = api.get_prediction_history(municipio, enfermedad=codigo, semanas=semanas)
         if tipo == "comparativo":
             observados = sum(int(item["casos"]) for item in resultado.get("historico", []))
-            proyectados = sum(int(item["casos"]) for item in resultado.get("prediccion", []))
+            proyectados = round(sum(float(item["casos"]) for item in resultado.get("prediccion", [])), 1)
             filas.append(
                 {
                     "Enfermedad": etiqueta,

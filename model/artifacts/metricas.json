@@ -1,700 +1,451 @@
 {
-  "fecha_entrenamiento": "2026-11-11T22:41:16",
+  "fecha_entrenamiento": "2026-11-12T22:56:28",
+  "arquitectura": "rf-municipal-v2",
   "split": {
-    "corte_test": "2025-06-23",
-    "filas_region_train": 831,
-    "filas_region_test": 210,
-    "filas_muni_test": 2520
-  },
-  "seleccion": {
-    "hiperparametros_region": {
-      "max_depth": null,
-      "min_samples_leaf": 3,
-      "max_features": 0.5
-    },
-    "grid_region": [
-      {
-        "max_depth": null,
-        "min_samples_leaf": 1,
-        "max_features": "sqrt",
-        "cv_mae_log": 0.5210252599413587
-      },
-      {
-        "max_depth": null,
-        "min_samples_leaf": 1,
-        "max_features": 0.5,
-        "cv_mae_log": 0.507152671128793
-      },
-      {
-        "max_depth": null,
-        "min_samples_leaf": 3,
-        "max_features": "sqrt",
-        "cv_mae_log": 0.5282933663695466
-      },
-      {
-        "max_depth": null,
-        "min_samples_leaf": 3,
-        "max_features": 0.5,
-        "cv_mae_log": 0.5060750533745857
-      },
-      {
-        "max_depth": null,
-        "min_samples_leaf": 5,
-        "max_features": "sqrt",
-        "cv_mae_log": 0.5395133908139471
-      },
-      {
-        "max_depth": null,
-        "min_samples_leaf": 5,
-        "max_features": 0.5,
-        "cv_mae_log": 0.5122350901546474
-      },
-      {
-        "max_depth": 8,
-        "min_samples_leaf": 1,
-        "max_features": "sqrt",
-        "cv_mae_log": 0.5255146947050714
-      },
-      {
-        "max_depth": 8,
-        "min_samples_leaf": 1,
-        "max_features": 0.5,
-        "cv_mae_log": 0.5078600020676693
-      },
-      {
-        "max_depth": 8,
-        "min_samples_leaf": 3,
-        "max_features": "sqrt",
-        "cv_mae_log": 0.5323097209850767
-      },
-      {
-        "max_depth": 8,
-        "min_samples_leaf": 3,
-        "max_features": 0.5,
-        "cv_mae_log": 0.5068188333708596
-      },
-      {
-        "max_depth": 8,
-        "min_samples_leaf": 5,
-        "max_features": "sqrt",
-        "cv_mae_log": 0.5432143602691016
-      },
-      {
-        "max_depth": 8,
-        "min_samples_leaf": 5,
-        "max_features": 0.5,
-        "cv_mae_log": 0.5109876428088167
-      }
-    ]
-  },
-  "test": {
-    "regional": {
-      "global": {
-        "n": 210,
-        "casos_medios": 5.6380952380952385,
-        "rf": {
-          "mae": 2.2469767891401617,
-          "rmse": 4.548736107629685,
-          "f1_macro": 0.5761346438999038,
-          "f1_por_clase": {
-            "bajo": 0.9456869009584664,
-            "medio": 0.7272727272727273,
-            "alto": 0.631578947368421,
-            "crítico": 0.0
-          },
-          "matriz_confusion": [
-            [
-              148,
-              7,
-              0,
-              0
-            ],
-            [
-              10,
-              32,
-              3,
-              0
-            ],
-            [
-              0,
-              4,
-              6,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ]
-          ]
-        },
-        "persistencia": {
-          "mae": 2.204761904761905,
-          "rmse": 3.997022701485504,
-          "f1_macro": 0.5167562724014337,
-          "f1_por_clase": {
-            "bajo": 0.9225806451612903,
-            "medio": 0.6444444444444445,
-            "alto": 0.5,
-            "crítico": 0.0
-          },
-          "matriz_confusion": [
-            [
-              143,
-              12,
-              0,
-              0
-            ],
-            [
-              11,
-              29,
-              5,
-              0
-            ],
-            [
-              1,
-              4,
-              5,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ]
-          ]
-        },
-        "sarima": {
-          "mae": 18.857249312764772,
-          "rmse": 32.23852169838151,
-          "f1_macro": 0.32294490252940733,
-          "f1_por_clase": {
-            "bajo": 0.6859504132231405,
-            "medio": 0.4329896907216495,
-            "alto": 0.1728395061728395,
-            "crítico": 0.0
-          },
-          "matriz_confusion": [
-            [
-              83,
-              28,
-              44,
-              0
-            ],
-            [
-              4,
-              21,
-              20,
-              0
-            ],
-            [
-              0,
-              3,
-              7,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ]
-          ]
-        }
-      },
+    "por_enfermedad": {
       "dengue": {
-        "n": 70,
-        "casos_medios": 13.528571428571428,
-        "rf": {
-          "mae": 4.431127486464375,
-          "rmse": 7.414368029899742,
-          "f1_macro": 0.6361001317523056,
-          "f1_por_clase": {
-            "bajo": 0.9565217391304348,
-            "medio": 0.7878787878787878,
-            "alto": 0.8,
-            "crítico": 0.0
-          },
-          "matriz_confusion": [
-            [
-              44,
-              0,
-              0,
-              0
-            ],
-            [
-              4,
-              13,
-              2,
-              0
-            ],
-            [
-              0,
-              1,
-              6,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ]
-          ]
-        },
-        "persistencia": {
-          "mae": 4.0,
-          "rmse": 6.244997998398398,
-          "f1_macro": 0.6065113047871669,
-          "f1_por_clase": {
-            "bajo": 0.9425287356321839,
-            "medio": 0.7692307692307693,
-            "alto": 0.7142857142857143,
-            "crítico": 0.0
-          },
-          "matriz_confusion": [
-            [
-              41,
-              3,
-              0,
-              0
-            ],
-            [
-              2,
-              15,
-              2,
-              0
-            ],
-            [
-              0,
-              2,
-              5,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ]
-          ]
-        },
-        "sarima": {
-          "mae": 52.57105682512942,
-          "rmse": 55.72125230393539,
-          "f1_macro": 0.045454545454545456,
-          "f1_por_clase": {
-            "bajo": 0.0,
-            "medio": 0.0,
-            "alto": 0.18181818181818182,
-            "crítico": 0.0
-          },
-          "matriz_confusion": [
-            [
-              0,
-              0,
-              44,
-              0
-            ],
-            [
-              0,
-              0,
-              19,
-              0
-            ],
-            [
-              0,
-              0,
-              7,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ]
-          ]
-        }
+        "corte_test": "2025-06-16",
+        "filas_train": 3324,
+        "filas_test": 840,
+        "rango_raw": "2020-W01 -> 2026-W43"
       },
       "influenza": {
-        "n": 70,
-        "casos_medios": 2.1,
-        "rf": {
-          "mae": 1.1729369711974227,
-          "rmse": 2.0885548689101383,
-          "f1_macro": 0.400225056264066,
-          "f1_por_clase": {
-            "bajo": 0.9032258064516129,
-            "medio": 0.6976744186046512,
-            "alto": 0.0,
-            "crítico": 0.0
-          },
-          "matriz_confusion": [
-            [
-              42,
-              5,
-              0,
-              0
-            ],
-            [
-              4,
-              15,
-              1,
-              0
-            ],
-            [
-              0,
-              3,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ]
-          ]
-        },
-        "persistencia": {
-          "mae": 1.4428571428571428,
-          "rmse": 2.41720026949716,
-          "f1_macro": 0.33873144399460187,
-          "f1_por_clase": {
-            "bajo": 0.8421052631578947,
-            "medio": 0.5128205128205128,
-            "alto": 0.0,
-            "crítico": 0.0
-          },
-          "matriz_confusion": [
-            [
-              40,
-              7,
-              0,
-              0
-            ],
-            [
-              7,
-              10,
-              3,
-              0
-            ],
-            [
-              1,
-              2,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ]
-          ]
-        },
-        "sarima": {
-          "mae": 1.534810361196223,
-          "rmse": 2.182669492155559,
-          "f1_macro": 0.3759089842833685,
-          "f1_por_clase": {
-            "bajo": 0.8505747126436781,
-            "medio": 0.6530612244897959,
-            "alto": 0.0,
-            "crítico": 0.0
-          },
-          "matriz_confusion": [
-            [
-              37,
-              10,
-              0,
-              0
-            ],
-            [
-              3,
-              16,
-              1,
-              0
-            ],
-            [
-              0,
-              3,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ]
-          ]
-        }
+        "corte_test": "2026-04-13",
+        "filas_train": 1332,
+        "filas_test": 336,
+        "rango_raw": "2024-W01 -> 2026-W44"
       },
       "covid": {
-        "n": 70,
-        "casos_medios": 1.2857142857142858,
-        "rf": {
-          "mae": 1.1368659097586884,
-          "rmse": 1.6547162316586324,
-          "f1_macro": 0.40885416666666663,
-          "f1_por_clase": {
-            "bajo": 0.96875,
-            "medio": 0.6666666666666666,
-            "alto": 0.0,
-            "crítico": 0.0
-          },
-          "matriz_confusion": [
-            [
-              62,
-              2,
-              0,
-              0
-            ],
-            [
-              2,
-              4,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ]
-          ]
-        },
-        "persistencia": {
-          "mae": 1.1714285714285715,
-          "rmse": 1.7566201313073597,
-          "f1_macro": 0.40885416666666663,
-          "f1_por_clase": {
-            "bajo": 0.96875,
-            "medio": 0.6666666666666666,
-            "alto": 0.0,
-            "crítico": 0.0
-          },
-          "matriz_confusion": [
-            [
-              62,
-              2,
-              0,
-              0
-            ],
-            [
-              2,
-              4,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ]
-          ]
-        },
-        "sarima": {
-          "mae": 2.465880751968677,
-          "rmse": 2.888743578138471,
-          "f1_macro": 0.29341410375893134,
-          "f1_por_clase": {
-            "bajo": 0.8288288288288288,
-            "medio": 0.3448275862068966,
-            "alto": 0.0,
-            "crítico": 0.0
-          },
-          "matriz_confusion": [
-            [
-              46,
-              18,
-              0,
-              0
-            ],
-            [
-              1,
-              5,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ],
-            [
-              0,
-              0,
-              0,
-              0
-            ]
-          ]
-        }
+        "corte_test": "2025-06-30",
+        "filas_train": 3252,
+        "filas_test": 828,
+        "rango_raw": "2020-W09 -> 2026-W44"
       }
     },
+    "filas_muni_train": 7908,
+    "filas_muni_test": 2004
+  },
+  "seleccion": {
+    "hiperparametros": {
+      "dengue": {
+        "max_depth": 8,
+        "min_samples_leaf": 3,
+        "max_features": 0.5
+      },
+      "influenza": {
+        "max_depth": null,
+        "min_samples_leaf": 5,
+        "max_features": 0.5
+      },
+      "covid": {
+        "max_depth": 8,
+        "min_samples_leaf": 1,
+        "max_features": 0.5
+      }
+    },
+    "grid": {
+      "dengue": [
+        {
+          "max_depth": null,
+          "min_samples_leaf": 1,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.2824878513825037
+        },
+        {
+          "max_depth": null,
+          "min_samples_leaf": 1,
+          "max_features": 0.5,
+          "cv_mae_log": 0.2875905926236856
+        },
+        {
+          "max_depth": null,
+          "min_samples_leaf": 3,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.2763241439239744
+        },
+        {
+          "max_depth": null,
+          "min_samples_leaf": 3,
+          "max_features": 0.5,
+          "cv_mae_log": 0.2778209084487891
+        },
+        {
+          "max_depth": null,
+          "min_samples_leaf": 5,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.27751639002411693
+        },
+        {
+          "max_depth": null,
+          "min_samples_leaf": 5,
+          "max_features": 0.5,
+          "cv_mae_log": 0.2764565315272911
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 1,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.27918363928610135
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 1,
+          "max_features": 0.5,
+          "cv_mae_log": 0.27978375908371816
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 3,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.27801569167555973
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 3,
+          "max_features": 0.5,
+          "cv_mae_log": 0.27437358633784636
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 5,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.280332871460245
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 5,
+          "max_features": 0.5,
+          "cv_mae_log": 0.27775410573041814
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 1,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.27922331820127194
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 1,
+          "max_features": 0.5,
+          "cv_mae_log": 0.2851972167386133
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 3,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.2778545780729364
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 3,
+          "max_features": 0.5,
+          "cv_mae_log": 0.27913705825832497
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 5,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.2767815138725953
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 5,
+          "max_features": 0.5,
+          "cv_mae_log": 0.2764960301640957
+        }
+      ],
+      "influenza": [
+        {
+          "max_depth": null,
+          "min_samples_leaf": 1,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.14136010672181382
+        },
+        {
+          "max_depth": null,
+          "min_samples_leaf": 1,
+          "max_features": 0.5,
+          "cv_mae_log": 0.14416440382953552
+        },
+        {
+          "max_depth": null,
+          "min_samples_leaf": 3,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.1409713978478915
+        },
+        {
+          "max_depth": null,
+          "min_samples_leaf": 3,
+          "max_features": 0.5,
+          "cv_mae_log": 0.1390898488279031
+        },
+        {
+          "max_depth": null,
+          "min_samples_leaf": 5,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.13965690402988723
+        },
+        {
+          "max_depth": null,
+          "min_samples_leaf": 5,
+          "max_features": 0.5,
+          "cv_mae_log": 0.1390653836705858
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 1,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.142386877764771
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 1,
+          "max_features": 0.5,
+          "cv_mae_log": 0.14424699498229146
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 3,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.14043621818413243
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 3,
+          "max_features": 0.5,
+          "cv_mae_log": 0.1399872374791614
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 5,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.1406954408602712
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 5,
+          "max_features": 0.5,
+          "cv_mae_log": 0.1394407453270754
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 1,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.1417449399495745
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 1,
+          "max_features": 0.5,
+          "cv_mae_log": 0.14428788780605944
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 3,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.14080472260134483
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 3,
+          "max_features": 0.5,
+          "cv_mae_log": 0.13924809156185902
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 5,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.14006038514258254
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 5,
+          "max_features": 0.5,
+          "cv_mae_log": 0.13908158035488266
+        }
+      ],
+      "covid": [
+        {
+          "max_depth": null,
+          "min_samples_leaf": 1,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.3627804325853841
+        },
+        {
+          "max_depth": null,
+          "min_samples_leaf": 1,
+          "max_features": 0.5,
+          "cv_mae_log": 0.3479911238717125
+        },
+        {
+          "max_depth": null,
+          "min_samples_leaf": 3,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.35466747043367863
+        },
+        {
+          "max_depth": null,
+          "min_samples_leaf": 3,
+          "max_features": 0.5,
+          "cv_mae_log": 0.33989059663940624
+        },
+        {
+          "max_depth": null,
+          "min_samples_leaf": 5,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.35499980778241674
+        },
+        {
+          "max_depth": null,
+          "min_samples_leaf": 5,
+          "max_features": 0.5,
+          "cv_mae_log": 0.3377050973327527
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 1,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.35232653205297565
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 1,
+          "max_features": 0.5,
+          "cv_mae_log": 0.3332378879426231
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 3,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.3510627894333022
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 3,
+          "max_features": 0.5,
+          "cv_mae_log": 0.33453662642584703
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 5,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.3515004616220926
+        },
+        {
+          "max_depth": 8,
+          "min_samples_leaf": 5,
+          "max_features": 0.5,
+          "cv_mae_log": 0.3341528444073224
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 1,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.3517567434275743
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 1,
+          "max_features": 0.5,
+          "cv_mae_log": 0.3414578431067353
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 3,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.3529349104586631
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 3,
+          "max_features": 0.5,
+          "cv_mae_log": 0.33622612547255215
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 5,
+          "max_features": "sqrt",
+          "cv_mae_log": 0.3536026177795676
+        },
+        {
+          "max_depth": 12,
+          "min_samples_leaf": 5,
+          "max_features": 0.5,
+          "cv_mae_log": 0.33625413257199843
+        }
+      ]
+    }
+  },
+  "test": {
     "municipal": {
       "global": {
-        "n": 2520,
-        "casos_medios": 0.46984126984126984,
-        "reparto": {
-          "mae": 0.3276192146062207,
-          "rmse": 1.0878733269696474,
-          "f1_macro": 0.49643929409826865,
+        "n": 2004,
+        "casos_medios": 0.5359281437125748,
+        "rf": {
+          "mae": 0.34577791259579577,
+          "rmse": 0.9518298940187981,
+          "exactitud": 0.9141716566866267,
+          "f1_macro": 0.6508252648410431,
           "f1_por_clase": {
-            "bajo": 0.962439239946973,
-            "medio": 0.453781512605042,
-            "alto": 0.5695364238410596,
-            "crítico": 0.0
+            "bajo": 0.9618915159944367,
+            "medio": 0.45051194539249145,
+            "alto": 0.6194690265486725,
+            "crítico": 0.5714285714285714
           },
           "matriz_confusion": [
             [
-              2178,
-              59,
-              9,
-              0
+              1729,
+              37,
+              4,
+              1
             ],
             [
               89,
-              81,
-              24,
+              66,
+              15,
               0
             ],
             [
-              12,
+              5,
               19,
-              43,
-              0
-            ],
-            [
-              1,
-              4,
-              1,
-              0
-            ]
-          ]
-        },
-        "persistencia": {
-          "mae": 0.3273809523809524,
-          "rmse": 1.0471048521655182,
-          "f1_macro": 0.5049238821455675,
-          "f1_por_clase": {
-            "bajo": 0.9507685453330363,
-            "medio": 0.3887468030690537,
-            "alto": 0.5135135135135135,
-            "crítico": 0.16666666666666666
-          },
-          "matriz_confusion": [
-            [
-              2134,
-              97,
-              12,
-              3
-            ],
-            [
-              93,
-              76,
-              24,
-              1
-            ],
-            [
-              13,
-              22,
-              38,
-              1
-            ],
-            [
-              3,
-              2,
-              0,
-              1
-            ]
-          ]
-        }
-      },
-      "dengue": {
-        "n": 840,
-        "casos_medios": 1.1273809523809524,
-        "reparto": {
-          "mae": 0.6689713688905717,
-          "rmse": 1.7764763095480285,
-          "f1_macro": 0.5249782692679158,
-          "f1_por_clase": {
-            "bajo": 0.938622754491018,
-            "medio": 0.5,
-            "alto": 0.6612903225806451,
-            "crítico": 0.0
-          },
-          "matriz_confusion": [
-            [
-              627,
               35,
-              6,
-              0
-            ],
-            [
-              38,
-              54,
-              21,
-              0
-            ],
-            [
-              2,
-              12,
-              41,
               0
             ],
             [
               1,
-              2,
               1,
-              0
+              0,
+              2
             ]
           ]
         },
         "persistencia": {
-          "mae": 0.6404761904761904,
-          "rmse": 1.629344010564345,
-          "f1_macro": 0.5836570741046724,
+          "mae": 0.3498003992015968,
+          "rmse": 1.1131136312559577,
+          "exactitud": 0.8937125748502994,
+          "f1_macro": 0.5583612023894438,
           "f1_por_clase": {
-            "bajo": 0.9294294294294294,
-            "medio": 0.5065502183406113,
-            "alto": 0.6486486486486487,
+            "bajo": 0.9497459062676454,
+            "medio": 0.4235294117647059,
+            "alto": 0.6101694915254238,
             "crítico": 0.25
           },
           "matriz_confusion": [
             [
-              619,
-              42,
-              5,
+              1682,
+              80,
+              7,
               2
             ],
             [
-              40,
-              58,
-              15,
+              82,
+              72,
+              16,
               0
             ],
             [
-              3,
-              15,
+              5,
+              17,
               36,
               1
             ],
@@ -705,80 +456,276 @@
               1
             ]
           ]
-        }
-      },
-      "influenza": {
-        "n": 840,
-        "casos_medios": 0.175,
-        "reparto": {
-          "mae": 0.15751846406970488,
-          "rmse": 0.49330372688617186,
-          "f1_macro": 0.3972935003826552,
+        },
+        "sarima": {
+          "mae": 2.1772592340875296,
+          "rmse": 5.658373329857478,
+          "exactitud": 0.7495009980039921,
+          "f1_macro": 0.31154390347517835,
           "f1_por_clase": {
-            "bajo": 0.9679075738125802,
-            "medio": 0.4731182795698925,
-            "alto": 0.14814814814814814,
+            "bajo": 0.8791679412664424,
+            "medio": 0.21014492753623187,
+            "alto": 0.1568627450980392,
             "crítico": 0.0
           },
           "matriz_confusion": [
             [
-              754,
-              13,
-              3,
+              1437,
+              58,
+              276,
               0
             ],
             [
+              53,
+              29,
+              88,
+              0
+            ],
+            [
+              4,
+              19,
+              36,
+              0
+            ],
+            [
+              4,
+              0,
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      "dengue": {
+        "n": 840,
+        "casos_medios": 1.1416666666666666,
+        "rf": {
+          "mae": 0.6155213704759912,
+          "rmse": 1.407814571147517,
+          "exactitud": 0.8702380952380953,
+          "f1_macro": 0.672886367342703,
+          "f1_por_clase": {
+            "bajo": 0.9449404761904762,
+            "medio": 0.5388127853881278,
+            "alto": 0.6363636363636364,
+            "crítico": 0.5714285714285714
+          },
+          "matriz_confusion": [
+            [
+              635,
               24,
-              22,
-              3,
+              4,
+              1
+            ],
+            [
+              42,
+              59,
+              15,
               0
             ],
             [
-              10,
-              7,
               2,
+              19,
+              35,
+              0
+            ],
+            [
+              1,
+              1,
+              0,
+              2
+            ]
+          ]
+        },
+        "persistencia": {
+          "mae": 0.65,
+          "rmse": 1.637361408166316,
+          "exactitud": 0.8464285714285714,
+          "f1_macro": 0.5788945222105888,
+          "f1_por_clase": {
+            "bajo": 0.9284099472494348,
+            "medio": 0.5,
+            "alto": 0.6371681415929203,
+            "crítico": 0.25
+          },
+          "matriz_confusion": [
+            [
+              616,
+              41,
+              5,
+              2
+            ],
+            [
+              42,
+              58,
+              16,
+              0
+            ],
+            [
+              3,
+              16,
+              36,
+              1
+            ],
+            [
+              2,
+              1,
+              0,
+              1
+            ]
+          ]
+        },
+        "sarima": {
+          "mae": 4.793456862002682,
+          "rmse": 8.711058708086103,
+          "exactitud": 0.5261904761904762,
+          "f1_macro": 0.2647725334266566,
+          "f1_por_clase": {
+            "bajo": 0.7284522706209453,
+            "medio": 0.16774193548387098,
+            "alto": 0.16289592760180996,
+            "crítico": 0.0
+          },
+          "matriz_confusion": [
+            [
+              393,
+              8,
+              263,
+              0
+            ],
+            [
+              16,
+              13,
+              87,
+              0
+            ],
+            [
+              2,
+              18,
+              36,
+              0
+            ],
+            [
+              4,
+              0,
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      "influenza": {
+        "n": 336,
+        "casos_medios": 0.0744047619047619,
+        "rf": {
+          "mae": 0.09473401720267598,
+          "rmse": 0.3033895860133791,
+          "exactitud": 0.9553571428571429,
+          "f1_macro": 0.24429223744292236,
+          "f1_por_clase": {
+            "bajo": 0.9771689497716894,
+            "medio": 0.0,
+            "alto": 0.0,
+            "crítico": 0.0
+          },
+          "matriz_confusion": [
+            [
+              321,
+              3,
+              0,
+              0
+            ],
+            [
+              9,
+              0,
+              0,
+              0
+            ],
+            [
+              3,
+              0,
+              0,
               0
             ],
             [
               0,
-              2,
+              0,
               0,
               0
             ]
           ]
         },
         "persistencia": {
-          "mae": 0.19642857142857142,
-          "rmse": 0.6555622813752365,
-          "f1_macro": 0.33151059852181575,
+          "mae": 0.10119047619047619,
+          "rmse": 0.4225771273642583,
+          "exactitud": 0.9375,
+          "f1_macro": 0.26859974009096815,
           "f1_por_clase": {
-            "bajo": 0.9526281635301752,
-            "medio": 0.2653061224489796,
-            "alto": 0.10810810810810811,
+            "bajo": 0.9691358024691358,
+            "medio": 0.10526315789473684,
+            "alto": 0.0,
             "crítico": 0.0
           },
           "matriz_confusion": [
             [
-              734,
-              28,
-              7,
-              1
-            ],
-            [
-              26,
-              13,
-              9,
-              1
-            ],
-            [
-              10,
-              7,
+              314,
+              8,
               2,
               0
             ],
             [
+              8,
               1,
+              0,
+              0
+            ],
+            [
+              2,
               1,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        "sarima": {
+          "mae": 0.17473117169176117,
+          "rmse": 0.3667174759929702,
+          "exactitud": 0.9345238095238095,
+          "f1_macro": 0.26461289869326965,
+          "f1_por_clase": {
+            "bajo": 0.9675425038639877,
+            "medio": 0.09090909090909091,
+            "alto": 0.0,
+            "crítico": 0.0
+          },
+          "matriz_confusion": [
+            [
+              313,
+              11,
+              0,
+              0
+            ],
+            [
+              8,
+              1,
+              0,
+              0
+            ],
+            [
+              2,
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
               0,
               0
             ]
@@ -786,28 +733,29 @@
         }
       },
       "covid": {
-        "n": 840,
-        "casos_medios": 0.10714285714285714,
-        "reparto": {
-          "mae": 0.15636781085838547,
-          "rmse": 0.38882963010920146,
-          "f1_macro": 0.2962622549019608,
+        "n": 828,
+        "casos_medios": 0.10869565217391304,
+        "rf": {
+          "mae": 0.17399801432613896,
+          "rmse": 0.38041714626663087,
+          "exactitud": 0.9420289855072463,
+          "f1_macro": 0.29892338203747926,
           "f1_por_clase": {
-            "bajo": 0.9767156862745098,
-            "medio": 0.20833333333333334,
+            "bajo": 0.9698870765370138,
+            "medio": 0.22580645161290322,
             "alto": 0.0,
             "crítico": 0.0
           },
           "matriz_confusion": [
             [
-              797,
-              11,
+              773,
+              10,
               0,
               0
             ],
             [
-              27,
-              5,
+              38,
+              7,
               0,
               0
             ],
@@ -826,26 +774,65 @@
           ]
         },
         "persistencia": {
-          "mae": 0.14523809523809525,
-          "rmse": 0.4525062483125562,
-          "f1_macro": 0.28070853960396036,
+          "mae": 0.1461352657004831,
+          "rmse": 0.4544466295731929,
+          "exactitud": 0.9239130434782609,
+          "f1_macro": 0.3129826548977148,
           "f1_por_clase": {
-            "bajo": 0.9665841584158416,
-            "medio": 0.15625,
+            "bajo": 0.9597957881301851,
+            "medio": 0.29213483146067415,
             "alto": 0.0,
             "crítico": 0.0
           },
           "matriz_confusion": [
             [
-              781,
-              27,
+              752,
+              31,
               0,
               0
             ],
             [
-              27,
-              5,
+              32,
+              13,
               0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        "sarima": {
+          "mae": 0.33576578181246985,
+          "rmse": 0.6738055958071123,
+          "exactitud": 0.9009661835748792,
+          "f1_macro": 0.3126337909228382,
+          "f1_por_clase": {
+            "bajo": 0.9475048606610499,
+            "medio": 0.30303030303030304,
+            "alto": 0.0,
+            "crítico": 0.0
+          },
+          "matriz_confusion": [
+            [
+              731,
+              39,
+              13,
+              0
+            ],
+            [
+              29,
+              15,
+              1,
               0
             ],
             [
@@ -866,49 +853,165 @@
     }
   },
   "shap_importancia_global": {
-    "rlog_lag3": 0.5666028892897462,
-    "rlog_lag0": 0.4844451874977655,
-    "rmedia_4s": 0.2531023948480833,
-    "rlog_lag4": 0.17434013417524755,
-    "rtasa_edad_65_mas": 0.09480122200675853,
-    "rlog_lag1": 0.06176022665148862,
-    "rtend_rel": 0.05066580901887976,
-    "rlog_lag2": 0.048412776613270474,
-    "rmedia_8s": 0.036616724231054686,
-    "rmax_8s": 0.027903174731731185,
-    "rlog_lag6": 0.018374603144721585,
-    "rtend": 0.017789634508497656,
-    "rtasa_edad_15_44": 0.017756229050326873,
-    "sem_cos": 0.017443603698832206,
-    "sem_sin": 0.01524604754956296,
-    "rlog_lag5": 0.014936553765238616,
-    "rtasa_edad_0_14": 0.012951021936229238,
-    "rlog_lag7": 0.010862574339111388,
-    "rtasa_edad_45_64": 0.008214059241370157,
-    "enfermedad_cod": 0.006797720955450428,
-    "rdef_4s": 0.0011909796976669138
+    "log_lag0": 0.23750552550088588,
+    "lag0": 0.22164742757128275,
+    "media_4s": 0.09993643124195843,
+    "lag3": 0.036414898028293285,
+    "log_lag3": 0.03520545656828716,
+    "lag1": 0.026048052275793876,
+    "sem_cos": 0.024693479340973767,
+    "media_8s": 0.02116996006645559,
+    "std_8s": 0.018897526804686485,
+    "log_lag1": 0.017454132203524122,
+    "max_8s": 0.012826839639496823,
+    "sem_sin": 0.01037147623439488,
+    "mun_cod": 0.006944157833314069,
+    "tendencia_rel": 0.006352551451308713,
+    "tasa_edad_15_44": 0.006070874845011763,
+    "tendencia": 0.005893389770744034,
+    "tasa_edad_45_64": 0.005813741049410687,
+    "tasa_edad_0_14": 0.004957129022970079,
+    "log_lag2": 0.004208593333929604,
+    "lag4": 0.00409128711525974,
+    "log_lag4": 0.003494863513030321,
+    "lag2": 0.003401975744798466,
+    "log_lag5": 0.0026773545507148243,
+    "lag5": 0.002620522968105816,
+    "tasa_edad_65_mas": 0.0022812774442034036,
+    "lag7": 0.002132775634728571,
+    "log_lag6": 0.0017763388329040553,
+    "lag6": 0.0016249331812218006,
+    "log_lag7": 0.0015015145299077052,
+    "def_4s": 0.00029438101060394695
+  },
+  "shap_por_enfermedad": {
+    "dengue": {
+      "lag3": 0.10605187729796625,
+      "log_lag3": 0.10310781879861375,
+      "log_lag0": 0.07929920974218879,
+      "lag0": 0.07447738164130603,
+      "media_4s": 0.06641551053463948,
+      "media_8s": 0.03720415960557069,
+      "sem_cos": 0.02919853199884593,
+      "std_8s": 0.026897600317041786,
+      "tendencia_rel": 0.011858027457963775,
+      "sem_sin": 0.011560482609424666,
+      "tendencia": 0.011535281331346476,
+      "lag4": 0.009811744710706574,
+      "max_8s": 0.009310679067969292,
+      "log_lag4": 0.007142199272635481,
+      "log_lag5": 0.006653547438544908,
+      "lag5": 0.0062576200636855405,
+      "lag2": 0.006082656794694488,
+      "log_lag2": 0.005275836016497722,
+      "tasa_edad_65_mas": 0.004992677580208313,
+      "mun_cod": 0.003910352468579033,
+      "log_lag6": 0.0032238006172142825,
+      "lag6": 0.003095932669621919,
+      "lag7": 0.0029569453183553125,
+      "tasa_edad_15_44": 0.0026381230761119484,
+      "tasa_edad_0_14": 0.00263591401668707,
+      "tasa_edad_45_64": 0.0020069129634959896,
+      "lag1": 0.0018273682503754574,
+      "log_lag7": 0.001779711433333144,
+      "log_lag1": 0.0016337566896716582,
+      "def_4s": 0.0008831430318118409
+    },
+    "influenza": {
+      "media_4s": 0.0649750250146259,
+      "sem_cos": 0.026059856056321936,
+      "max_8s": 0.01715749532117161,
+      "std_8s": 0.01608331369593886,
+      "log_lag0": 0.01252453762773701,
+      "lag0": 0.010681863319020136,
+      "media_8s": 0.00951701657149154,
+      "mun_cod": 0.009226965302687285,
+      "sem_sin": 0.008402160135055325,
+      "tasa_edad_15_44": 0.0062471633885976124,
+      "tasa_edad_0_14": 0.005750457463160814,
+      "tendencia": 0.0046431626872168825,
+      "tendencia_rel": 0.0045020886954301375,
+      "log_lag4": 0.0026028186121369186,
+      "lag1": 0.0019779347944109947,
+      "lag4": 0.001915963340255688,
+      "log_lag1": 0.001501966790756059,
+      "tasa_edad_45_64": 0.0014902923764785457,
+      "lag7": 0.0013613288609548285,
+      "log_lag7": 0.0011895339597786452,
+      "log_lag3": 0.0011014888668445392,
+      "lag3": 0.000839196560742395,
+      "lag2": 0.0005231158559435812,
+      "log_lag5": 0.0005121987398435063,
+      "log_lag2": 0.0004713923561108005,
+      "tasa_edad_65_mas": 0.00038661978543816356,
+      "lag6": 0.000346094533435043,
+      "lag5": 0.00034028859029404157,
+      "log_lag6": 0.00030793552883758913,
+      "def_4s": 0.0
+    },
+    "covid": {
+      "log_lag0": 0.6206928291327318,
+      "lag0": 0.5797830377535221,
+      "media_4s": 0.16841875817660987,
+      "lag1": 0.07433885378259518,
+      "log_lag1": 0.049226673130144644,
+      "sem_cos": 0.018822049967753437,
+      "media_8s": 0.016788704022304538,
+      "tasa_edad_45_64": 0.013944017808257526,
+      "std_8s": 0.01371166640107881,
+      "max_8s": 0.012012344529349567,
+      "sem_sin": 0.011151785958704648,
+      "tasa_edad_15_44": 0.00932733807032573,
+      "mun_cod": 0.007695155728675889,
+      "log_lag2": 0.006878551629180287,
+      "tasa_edad_0_14": 0.006485015589062354,
+      "lag2": 0.0036001545837573297,
+      "tendencia_rel": 0.0026975382005322256,
+      "lag3": 0.002353620226171202,
+      "lag7": 0.0020800527248755717,
+      "log_lag6": 0.0017972803526602943,
+      "log_lag7": 0.001535298196611326,
+      "tendencia": 0.0015017252936687462,
+      "tasa_edad_65_mas": 0.0014645349669637348,
+      "lag6": 0.0014327723406084396,
+      "log_lag3": 0.0014070620394032042,
+      "lag5": 0.0012636602503378665,
+      "log_lag5": 0.0008663174737560596,
+      "log_lag4": 0.0007395726543185638,
+      "lag4": 0.0005461532948169576,
+      "def_4s": 0.0
+    }
   },
   "importancia_nativa": {
-    "rlog_lag3": 0.3731019733065239,
-    "rlog_lag0": 0.24545360275022982,
-    "rmedia_4s": 0.11702002888724929,
-    "rlog_lag4": 0.09750446389444983,
-    "rlog_lag2": 0.04010524020926037,
-    "rlog_lag1": 0.035142799565305624,
-    "rmedia_8s": 0.03079296981549275,
-    "rmax_8s": 0.015615052368001921,
-    "rtend_rel": 0.007396197329088516,
-    "rtasa_edad_65_mas": 0.00554588308601171,
-    "rtend": 0.004998175877540652,
-    "rlog_lag7": 0.0042275047589600745,
-    "sem_cos": 0.00409717271015127,
-    "rlog_lag5": 0.0036881042899851654,
-    "rtasa_edad_45_64": 0.0035168584872295188,
-    "rtasa_edad_15_44": 0.0033304258068628328,
-    "sem_sin": 0.0025901152241044672,
-    "rlog_lag6": 0.002520678835978578,
-    "rtasa_edad_0_14": 0.0022061606024084495,
-    "enfermedad_cod": 0.0007076795736796052,
-    "rdef_4s": 0.00043891262148581763
+    "media_4s": 0.18580558924829704,
+    "log_lag0": 0.17162268638709713,
+    "lag0": 0.1575176340447402,
+    "lag3": 0.09125978423010656,
+    "log_lag3": 0.08479731287360433,
+    "max_8s": 0.0486666654101407,
+    "media_8s": 0.03478528217929307,
+    "sem_cos": 0.03285027972937219,
+    "lag1": 0.031120743201800295,
+    "std_8s": 0.028390695209581724,
+    "log_lag1": 0.018491096224705805,
+    "tendencia_rel": 0.013972615602982,
+    "tasa_edad_15_44": 0.011952009862804716,
+    "tendencia": 0.011061063285012976,
+    "sem_sin": 0.009581027205169772,
+    "tasa_edad_0_14": 0.00918839840687748,
+    "mun_cod": 0.007991382175354467,
+    "log_lag2": 0.007425136962466196,
+    "lag2": 0.006855651671579724,
+    "log_lag4": 0.004986620528063325,
+    "lag4": 0.004976283067646949,
+    "lag5": 0.004897375800708144,
+    "log_lag5": 0.004121265584291235,
+    "tasa_edad_45_64": 0.003960448069633322,
+    "tasa_edad_65_mas": 0.0031373862355763265,
+    "lag7": 0.002755198376423468,
+    "log_lag6": 0.0027034315434155726,
+    "lag6": 0.0026279092214960883,
+    "log_lag7": 0.002275852587672478,
+    "def_4s": 0.0002231750740867359
   }
 }

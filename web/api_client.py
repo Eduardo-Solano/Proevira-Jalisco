@@ -12,16 +12,18 @@ DEMO_MODE = os.getenv("PROEVIRA_DEMO_MODE", "false").strip().lower() in {"1", "t
 REQUEST_TIMEOUT = 20.0
 
 MUNICIPIOS_JALISCO = {
-    "14039": {"nombre": "Guadalajara", "lat": 20.6767, "lon": -103.3475},
-    "14120": {"nombre": "Zapopan", "lat": 20.7236, "lon": -103.3848},
-    "14098": {"nombre": "Tlaquepaque", "lat": 20.6409, "lon": -103.3128},
-    "14101": {"nombre": "Tonalá", "lat": 20.6244, "lon": -103.2343},
-    "14097": {"nombre": "Tlajomulco de Zúñiga", "lat": 20.4742, "lon": -103.4447},
-    "14067": {"nombre": "Puerto Vallarta", "lat": 20.6534, "lon": -105.2253},
-    "14023": {"nombre": "Ciudad Guzmán (Zapotlán el Grande)", "lat": 19.7047, "lon": -103.4619},
-    "14053": {"nombre": "Lagos de Moreno", "lat": 21.3533, "lon": -101.9317},
-    "14093": {"nombre": "Tepatitlán de Morelos", "lat": 20.8172, "lon": -102.7636},
-    "14015": {"nombre": "Autlán de Navarro", "lat": 19.7719, "lon": -104.3644},
+    "14039": {"nombre": "Guadalajara", "lat": 20.676470, "lon": -103.347811},
+    "14120": {"nombre": "Zapopan", "lat": 20.716405, "lon": -103.416947},
+    "14098": {"nombre": "San Pedro Tlaquepaque", "lat": 20.610214, "lon": -103.320670},
+    "14101": {"nombre": "Tonalá", "lat": 20.630600, "lon": -103.251448},
+    "14097": {"nombre": "Tlajomulco de Zúñiga", "lat": 20.521658, "lon": -103.432591},
+    "14070": {"nombre": "El Salto", "lat": 20.542290, "lon": -103.282728},
+    "14124": {"nombre": "Zapotlanejo", "lat": 20.622212, "lon": -103.068761},
+    "14044": {"nombre": "Ixtlahuacán de los Membrillos", "lat": 20.385805, "lon": -103.191998},
+    "14045": {"nombre": "Ixtlahuacán del Río", "lat": 20.863757, "lon": -103.210450},
+    "14051": {"nombre": "Juanacatlán", "lat": 20.507934, "lon": -103.167543},
+    "14029": {"nombre": "Cuquío", "lat": 20.930300, "lon": -103.028588},
+    "14071": {"nombre": "San Cristóbal de la Barranca", "lat": 21.046300, "lon": -103.427390},
 }
 
 ENFERMEDADES_API = {"covid-19": "covid", "covid": "covid"}

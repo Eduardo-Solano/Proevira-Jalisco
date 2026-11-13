@@ -1,5 +1,8 @@
-"""Backtest de origen móvil (expanding window) para evaluar el modelo en distintos periodos, incluido el brote
-de dengue de 2024. Reutiliza las funciones de train.py y los hiperparámetros congelados en modelo_rf.pkl.
+"""Backtest de origen móvil (expanding window) por enfermedad y municipio.
+
+Evalúa el desempeño fuera de muestra en bloques de 26 semanas (incluido el brote
+de dengue 2024 y las temporadas 2024-2026) reutilizando las funciones y los
+hiperparámetros congelados de train.py / modelo_rf.pkl.
 
 Uso: python model/backtest.py
 Salida: model/artifacts/backtest.json
@@ -17,62 +20,119 @@ import train as T  # noqa: E402
 
 BLOCK_WEEKS = 26
 FIRST_TEST = pd.Timestamp("2023-07-01")
+MIN_TRAIN_WEEKS = 26
 
 
 def main():
-    raw = pd.read_parquet(T.DATA)
-    region = T.build_region(raw)
-    muni = T.build_muni(raw, region)
-    rall = region.dropna(subset=T.REG_FEATURES + ["rlog_next"]).reset_index(drop=True)
-    mall = muni.dropna(subset=["share", "casos_next"]).reset_index(drop=True)
-    pr = joblib.load(os.path.join(T.ART, "modelo_rf.pkl"))["hiperparametros"]["region"]
+    raw = T.load_raw(T.DATA)
+    art = joblib.load(os.path.join(T.ART, "modelo_rf.pkl"))
+    mun_cod_map = art["mun_cod_map"]
+    best_params = art["hiperparametros"]
 
-    weeks = np.sort(rall["fecha_inicio_semana"].unique())
-    starts = [pd.Timestamp(w) for w in weeks[::BLOCK_WEEKS] if pd.Timestamp(w) >= FIRST_TEST]
-    folds = []
-    for s in starts:
-        e = s + BLOCK_WEEKS * T.WEEK
-        rtr = rall[rall["fecha_inicio_semana"] < s - T.WEEK]
-        rte = rall[(rall["fecha_inicio_semana"] >= s) & (rall["fecha_inicio_semana"] < e)]
-        mte = mall[(mall["fecha_inicio_semana"] >= s) & (mall["fecha_inicio_semana"] < e)]
-        if len(rte) == 0:
-            continue
-        th_r = T.thresholds(region[region["fecha_inicio_semana"] < s], ["enfermedad"])
-        th_m = T.thresholds(raw[raw["fecha_inicio_semana"] < s], ["municipio_id", "enfermedad"])
-        rp, mp = T.predict(T.fit_model(rtr, pr), rte, mte)
-        ev = T.evaluar(rp, mp, rte, th_r, th_m, sarima=T.sarima_region(region, s))
-        folds.append({"inicio": str(s.date()), "fin": str((e - T.WEEK).date()), "evaluacion": ev})
-        print(f"fold {s.date()} .. {(e - T.WEEK).date()} listo")
+    featured = T.build_features(raw, mun_cod_map, with_target=True)
+    labeled = featured.dropna(subset=T.FEATURES + ["log_next"]).reset_index(drop=True)
 
-    # Tabla resumen
-    print("\n== REGIONAL por bloque de 26 semanas (MAE: RF / persistencia / SARIMA | F1: RF / persistencia) ==")
-    for f in folds:
-        print(f"-- {f['inicio']} .. {f['fin']}")
-        for k, d in f["evaluacion"]["regional"].items():
-            if k == "global":
+    folds_by_disease = {e: [] for e in T.ENFERMEDADES}
+    all_eval_parts = []
+
+    for enf in T.ENFERMEDADES:
+        d_raw = raw[raw["enfermedad"] == enf]
+        d_enf = labeled[labeled["enfermedad"] == enf].copy()
+        weeks = np.sort(d_enf["fecha_inicio_semana"].unique())
+        starts = [pd.Timestamp(w) for w in weeks[::BLOCK_WEEKS] if pd.Timestamp(w) >= FIRST_TEST]
+
+        for s in starts:
+            e = s + BLOCK_WEEKS * T.WEEK
+            tr = d_enf[d_enf["fecha_inicio_semana"] < s - T.WEEK].copy()
+            te = d_enf[(d_enf["fecha_inicio_semana"] >= s) & (d_enf["fecha_inicio_semana"] < e)].copy()
+            if tr["fecha_inicio_semana"].nunique() < MIN_TRAIN_WEEKS or len(te) == 0:
                 continue
-            s = d["sarima"]
-            print(f"   {k:10s} medios={d['casos_medios']:6.1f} | MAE {d['rf']['mae']:6.2f} / {d['persistencia']['mae']:6.2f} / "
-                  f"{s['mae']:6.2f} | F1 {d['rf']['f1_macro']:.2f} / {d['persistencia']['f1_macro']:.2f}")
 
-    print("\n== AGREGADO (promedio ponderado por n sobre todos los bloques) ==")
-    agg = {}
-    for lvl in ("regional", "municipal"):
-        for k in ("global", "dengue", "influenza", "covid"):
-            rows = [(f["evaluacion"][lvl][k]) for f in folds]
-            n = np.array([r["n"] for r in rows], float)
-            w = n / n.sum()
-            names = ["rf", "persistencia", "sarima"] if lvl == "regional" else ["reparto", "persistencia"]
-            res = {m: {"mae": float(np.dot(w, [r[m]["mae"] for r in rows])),
-                       "f1_macro": float(np.dot(w, [r[m]["f1_macro"] for r in rows]))} for m in names}
-            agg[f"{lvl}_{k}"] = res
-            print(f"{lvl:9s} {k:10s} " + " | ".join(f"{m} MAE {v['mae']:.3f} F1 {v['f1_macro']:.2f}" for m, v in res.items()))
+            th = T.thresholds(d_raw[d_raw["fecha_inicio_semana"] < s])
+            model = T.fit_disease(tr, best_params[enf])
+            te["pred_rf"] = np.clip(np.expm1(model.predict(te[T.FEATURES])), 0.0, None)
+            sar = T.sarima_municipal(d_raw, s)
+            te = te.merge(sar, on=["municipio_id", "fecha_inicio_semana"], how="left")
+
+            ev = T.evaluate_predictions(te, th)["municipal"][enf]
+            folds_by_disease[enf].append(
+                {"inicio": str(s.date()), "fin": str((e - T.WEEK).date()), "evaluacion": ev}
+            )
+            te["fold_inicio"] = str(s.date())
+            te["clase_true"] = T.to_class(te["casos_next"], T.mkey(te), th)
+            te["clase_rf"] = T.to_class(np.round(te["pred_rf"]), T.mkey(te), th)
+            te["clase_pers"] = T.to_class(te["lag0"], T.mkey(te), th)
+            te["clase_sar"] = T.to_class(np.round(te["pred_sarima"]), T.mkey(te), th)
+            all_eval_parts.append(te)
+            print(f"[{enf:9s}] fold {s.date()} .. {(e - T.WEEK).date()} | n={len(te)} MAE RF {ev['rf']['mae']:.3f} vs persist {ev['persistencia']['mae']:.3f}")
+
+    print("\n== AGREGADO BACKTEST MUNICIPAL (promedio ponderado por n) ==")
+    agregado = {}
+    for enf in T.ENFERMEDADES:
+        rows = [f["evaluacion"] for f in folds_by_disease[enf]]
+        if not rows:
+            continue
+        n = np.array([r["n"] for r in rows], dtype=float)
+        w = n / n.sum()
+        res = {
+            "n_total": int(n.sum()),
+            "folds": len(rows),
+        }
+        for m in ("rf", "persistencia", "sarima"):
+            if all(m in r for r in rows):
+                res[m] = {
+                    "mae": float(np.dot(w, [r[m]["mae"] for r in rows])),
+                    "rmse": float(np.dot(w, [r[m]["rmse"] for r in rows])),
+                    "exactitud": float(np.dot(w, [r[m]["exactitud"] for r in rows])),
+                    "f1_macro": float(np.dot(w, [r[m]["f1_macro"] for r in rows])),
+                }
+        agregado[enf] = res
+        print(
+            f"{enf:10s} n={res['n_total']:4d} | "
+            f"MAE RF {res['rf']['mae']:.3f} persist {res['persistencia']['mae']:.3f} SARIMA {res['sarima']['mae']:.3f} | "
+            f"Acc RF {res['rf']['exactitud']*100:5.1f}% | F1 RF {res['rf']['f1_macro']:.3f} persist {res['persistencia']['f1_macro']:.3f}"
+        )
+
+    if all_eval_parts:
+        pooled = pd.concat(all_eval_parts, ignore_index=True)
+        n_glob = len(pooled)
+        agregado["global"] = {
+            "n_total": int(n_glob),
+            "rf": {
+                "mae": T.mae(pooled["casos_next"], pooled["pred_rf"]),
+                "rmse": T.rmse(pooled["casos_next"], pooled["pred_rf"]),
+                "exactitud": float((pooled["clase_true"] == pooled["clase_rf"]).mean()),
+                "f1_macro": float(T.f1_score(pooled["clase_true"], pooled["clase_rf"], average="macro", labels=range(4), zero_division=0)),
+            },
+            "persistencia": {
+                "mae": T.mae(pooled["casos_next"], pooled["lag0"]),
+                "rmse": T.rmse(pooled["casos_next"], pooled["lag0"]),
+                "exactitud": float((pooled["clase_true"] == pooled["clase_pers"]).mean()),
+                "f1_macro": float(T.f1_score(pooled["clase_true"], pooled["clase_pers"], average="macro", labels=range(4), zero_division=0)),
+            },
+            "sarima": {
+                "mae": T.mae(pooled["casos_next"], pooled["pred_sarima"]),
+                "rmse": T.rmse(pooled["casos_next"], pooled["pred_sarima"]),
+                "exactitud": float((pooled["clase_true"] == pooled["clase_sar"]).mean()),
+                "f1_macro": float(T.f1_score(pooled["clase_true"], pooled["clase_sar"], average="macro", labels=range(4), zero_division=0)),
+            },
+        }
+        g = agregado["global"]
+        print(
+            f"{'global':10s} n={g['n_total']:4d} | "
+            f"MAE RF {g['rf']['mae']:.3f} persist {g['persistencia']['mae']:.3f} SARIMA {g['sarima']['mae']:.3f} | "
+            f"Acc RF {g['rf']['exactitud']*100:5.1f}% | F1 RF {g['rf']['f1_macro']:.3f} persist {g['persistencia']['f1_macro']:.3f}"
+        )
 
     with open(os.path.join(T.ART, "backtest.json"), "w", encoding="utf-8") as fh:
-        json.dump({"bloque_semanas": BLOCK_WEEKS, "agregado": agg, "folds": folds}, fh, indent=2,
-                  ensure_ascii=False, default=str)
+        json.dump(
+            {"bloque_semanas": BLOCK_WEEKS, "agregado": agregado, "folds_por_enfermedad": folds_by_disease},
+            fh,
+            indent=2,
+            ensure_ascii=False,
+            default=str,
+        )
 
 
 if __name__ == "__main__":
     main()
-

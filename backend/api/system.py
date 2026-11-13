@@ -43,22 +43,36 @@ def version_info():
 
     latest_week = None
     predicted_week = None
+    per_disease = {}
     if inference_engine.loaded and inference_engine.raw_data is not None:
-        latest_date = inference_engine.raw_data["fecha_inicio_semana"].max()
+        raw_df = inference_engine.raw_data
+        latest_date = raw_df["fecha_inicio_semana"].max()
         if not pd.isna(latest_date):
-            latest_week = str(inference_engine.raw_data.loc[
-                inference_engine.raw_data["fecha_inicio_semana"] == latest_date,
+            latest_week = str(raw_df.loc[
+                raw_df["fecha_inicio_semana"] == latest_date,
                 "semana",
             ].iloc[0])
             next_week = (pd.Timestamp(latest_date) + pd.Timedelta(days=7)).isocalendar()
             predicted_week = f"{next_week.year}-W{next_week.week:02d}"
 
+        for enf, sub in raw_df.groupby("enfermedad"):
+            dt_enf = sub["fecha_inicio_semana"].max()
+            if pd.isna(dt_enf):
+                continue
+            sem_obs = str(sub.loc[sub["fecha_inicio_semana"] == dt_enf, "semana"].iloc[0])
+            nxt_iso = (pd.Timestamp(dt_enf) + pd.Timedelta(days=7)).isocalendar()
+            per_disease[str(enf)] = {
+                "ultima_semana_datos": sem_obs,
+                "semana_prediccion": f"{nxt_iso.year}-W{nxt_iso.week:02d}",
+            }
+
     return {
         "api": "1.0",
-        "modelo": "rf-regresor-regional-v1",
+        "modelo": "rf-municipal-v2",
         "fecha_entrenamiento": fecha_entrenamiento,
         "ultima_semana_datos": latest_week,
         "semana_prediccion": predicted_week,
+        "por_enfermedad": per_disease,
         "sistema": settings.PROJECT_NAME
     }
 
@@ -84,6 +98,7 @@ def model_metrics():
 
     return {
         "fecha_entrenamiento": data.get("fecha_entrenamiento"),
+        "arquitectura": data.get("arquitectura", "rf-municipal-v2"),
         "split": data.get("split", {}),
         "test": data.get("test", {}),
     }

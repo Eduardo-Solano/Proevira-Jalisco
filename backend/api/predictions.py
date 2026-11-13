@@ -113,34 +113,14 @@ def get_prediction_explanation(
     current_user: dict = Depends(require_roles(["funcionario", "medico"]))
 ):
     """
-    Explicabilidad SHAP detallada de la predicción activa.
+    Explicabilidad SHAP local de la predicción municipal activa (con respaldo global por enfermedad).
     """
-    pred = inference_engine.predict_municipio(municipio, semana=semana, enfermedad=enfermedad)
-
-    # Cargar importancia SHAP global
-    metricas_path = os.path.join(settings.MODEL_ARTIFACTS_DIR, "metricas.json")
-    feature_imp = []
-    base_val = 0.0
-
-    if os.path.exists(metricas_path):
-        try:
-            with open(metricas_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                shap_dict = data.get("shap_importancia_global", {})
-                feature_imp = [
-                    FeatureImportanceItem(feature=k, shap=round(float(v), 4))
-                    for k, v in shap_dict.items()
-                ]
-        except Exception:
-            pass
-
-    return ExplainResponse(
-        municipio=pred["municipio"],
-        semana=pred["semana"],
-        enfermedad=pred["enfermedad"],
-        casos_esperados=pred["casos_esperados"],
-        nivel_riesgo=pred["nivel_riesgo"],
-        base_value=base_val,
-        feature_importance=feature_imp
-    )
+    try:
+        res = inference_engine.explain_municipio(municipio, semana=semana, enfermedad=enfermedad)
+        return ExplainResponse(**res)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error generando explicación SHAP: {str(e)}"
+        )
 

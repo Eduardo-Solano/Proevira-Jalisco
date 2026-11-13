@@ -155,12 +155,13 @@ def render_resumen_view():
     with izquierda:
         with st.container(border=True):
             st.markdown('<div class="panel-title">Señales por enfermedad</div>', unsafe_allow_html=True)
+            filtro_enf = "covid" if ENFERMEDADES[enfermedad] == "covid-19" else ENFERMEDADES[enfermedad]
             for nombre, codigo, color, fondo in (
                 ("Dengue", "dengue", "#b54755", "#f7e9eb"),
                 ("Influenza", "influenza", "#bd9b43", "#f6f1df"),
-                ("COVID-19", "covid-19", "#4e9577", "#e9f3ed"),
+                ("COVID-19", "covid", "#4e9577", "#e9f3ed"),
             ):
-                if ENFERMEDADES[enfermedad] and codigo != ENFERMEDADES[enfermedad]:
+                if filtro_enf and codigo != filtro_enf:
                     continue
                 sub = df[df["enfermedad"].str.lower() == codigo] if "enfermedad" in df else df
                 riesgo_alto = int(sub["nivel_riesgo"].astype(str).str.lower().isin(["alto", "crítico"]).sum())
