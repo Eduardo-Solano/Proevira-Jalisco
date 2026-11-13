@@ -228,26 +228,6 @@ section[data-testid="stSidebar"] div[data-testid="stRadio"] label p {
     color: #fff;
     background: rgba(255,255,255,.08);
 }
-.st-key-header_exit {
-    position: fixed;
-    top: 17px;
-    right: 12px;
-    z-index: 1001;
-    width: 76px;
-}
-.st-key-header_exit button {
-    min-height: 36px;
-    border: 1px solid #d3d8de;
-    border-radius: 6px;
-    color: #454545;
-    background: #fff;
-    font-weight: 600;
-}
-.st-key-header_exit button:hover {
-    border-color: #9099a2;
-    color: #222;
-    background: #f3f5f7;
-}
 .exit-card {
     max-width: 560px;
     margin: 16vh auto 1rem;
@@ -488,8 +468,6 @@ div[data-testid="stSlider"] label { color: #526861; font-weight: 600; }
     .st-key-sidebar_exit { position: static; width: auto; }
     .sidebar-profile { max-width: 100%; }
     .risk-legend-note { width: 100%; margin-left: 0; }
-    .st-key-header_exit { top: 16px; right: 8px; width: 60px; z-index: 1001; }
-    .st-key-header_exit button { min-height: 34px; padding: 0 .45rem; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -517,6 +495,12 @@ header[data-testid="stHeader"] [data-testid="stToolbar"] > div {{
     display: block !important;
     pointer-events: none;
 }}
+header[data-testid="stHeader"] [data-testid="stToolbarActions"],
+header[data-testid="stHeader"] [data-testid="stStatusWidget"],
+header[data-testid="stHeader"] [data-testid="stAppDeployButton"],
+header[data-testid="stHeader"] [data-testid="stMainMenu"] {{
+    display: none !important;
+}}
 header[data-testid="stHeader"] [data-testid="stExpandSidebarButton"] {{
     position: absolute;
     top: 27px;
@@ -540,7 +524,7 @@ header[data-testid="stHeader"] [data-testid="stToolbar"]::after {{
     flex: 0 0 190px;
     height: 64px;
     margin-left: auto;
-    margin-right: 88px;
+    margin-right: 14px;
     background: url("data:image/png;base64,{LOGO_BASE64}") no-repeat right center / contain;
 }}
 @media (max-width: 760px) {{
@@ -559,7 +543,7 @@ header[data-testid="stHeader"] [data-testid="stToolbar"]::after {{
     header[data-testid="stHeader"] [data-testid="stToolbar"]::after {{
         flex-basis: 126px;
         height: 42px;
-        margin-right: 72px;
+        margin-right: 8px;
     }}
 }}
 </style>
@@ -615,11 +599,6 @@ else:
             if st.button("Salir", use_container_width=True):
                 _salir_del_panel()
                 st.rerun()
-
-    with st.container(key="header_exit"):
-        if st.button("Salir", key="header_exit_button", help="Cerrar sesión y salir del panel"):
-            _salir_del_panel()
-            st.rerun()
 
     try:
         if seccion == NAV[0]:
