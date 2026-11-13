@@ -1,6 +1,8 @@
 """Vista de distribución geográfica del riesgo epidemiológico."""
 
+import json
 from html import escape
+from pathlib import Path
 
 import folium
 import pandas as pd
@@ -16,6 +18,8 @@ COLOR_RIESGO = {
     "alto": "#d17d45",
     "crítico": "#b54755",
 }
+JALISCO_BOUNDARY_PATH = Path(__file__).resolve().parents[2] / "data" / "geo" / "jalisco.geojson"
+JALISCO_BOUNDS_PADDING = 0.35
 
 
 def render_mapa_view():
@@ -86,13 +90,40 @@ def render_mapa_view():
         with st.container(border=True):
             st.markdown('<div class="panel-title">Mapa epidemiológico</div>', unsafe_allow_html=True)
             st.caption(f"{enfermedad} · {semana} · {indicador}")
+            st.caption("Vista de Jalisco con desplazamiento limitado al estado y su entorno inmediato.")
+            with JALISCO_BOUNDARY_PATH.open(encoding="utf-8") as boundary_file:
+                jalisco_boundary = json.load(boundary_file)
+            west, south, east, north = jalisco_boundary["bbox"]
+            map_bounds = [
+                [south - JALISCO_BOUNDS_PADDING, west - JALISCO_BOUNDS_PADDING],
+                [north + JALISCO_BOUNDS_PADDING, east + JALISCO_BOUNDS_PADDING],
+            ]
             mapa = folium.Map(
-                location=[20.6597, -103.3496],
-                zoom_start=10,
+                location=[(south + north) / 2, (west + east) / 2],
+                min_zoom=6,
+                max_zoom=12,
+                zoom_start=7,
                 tiles="OpenStreetMap",
+                max_bounds=True,
+                min_lat=map_bounds[0][0],
+                min_lon=map_bounds[0][1],
+                max_lat=map_bounds[1][0],
+                max_lon=map_bounds[1][1],
                 prefer_canvas=True,
+                maxBoundsViscosity=1,
             )
-            mapa.fit_bounds(df[["lat", "lon"]].values.tolist(), padding=(18, 18), max_zoom=11)
+            mapa.fit_bounds([[south, west], [north, east]], padding=(12, 12), max_zoom=7)
+            folium.GeoJson(
+                jalisco_boundary,
+                name="Límite de Jalisco",
+                style_function=lambda feature: {
+                    "color": "#b54755",
+                    "weight": 3,
+                    "fillColor": "#b54755",
+                    "fillOpacity": 0.06,
+                },
+                tooltip=folium.GeoJsonTooltip(fields=["shapeName"], aliases=["Estado:"]),
+            ).add_to(mapa)
 
             if modo == "Mapa de calor":
                 peso_riesgo = {"bajo": 1, "medio": 2, "alto": 3, "crítico": 4}
@@ -134,10 +165,11 @@ def render_mapa_view():
             st_folium(
                 mapa,
                 height=480,
-                key=f"map_{enfermedad}_{semana}_{modo[:3]}",
+                key=f"map_{enfermedad}_{semana}_{modo[:3]}_jalisco",
                 returned_objects=[],
                 use_container_width=True,
             )
+            st.caption("Límite estatal: INEGI, vía geoBoundaries · CC BY 3.0 IGO.")
             nota_leyenda = (
                     "Color e intensidad: riesgo; tamaño del marcador: casos estimados."
                     if indicador == "Nivel de riesgo"
