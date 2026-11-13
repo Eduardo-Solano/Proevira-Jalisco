@@ -136,7 +136,10 @@ class InferenceEngine:
         if not th:
             th = self.thresholds_region.get(enfermedad, [1.0, 5.0, 15.0])
 
-        idx = int(np.searchsorted(th, casos_esperados, side="left"))
+        # Mismo criterio que en train.py/evaluación: el riesgo se calcula con los casos esperados REDONDEADOS
+        # (un valor de 0.02 casos no debe cruzar el corte 0 y marcar riesgo "medio").
+        casos_redondeados = int(np.round(casos_esperados))
+        idx = int(np.searchsorted(th, casos_redondeados, side="left"))
         idx = min(idx, len(self.labels) - 1)
         nivel_riesgo = self.labels[idx]
 
@@ -166,6 +169,8 @@ class InferenceEngine:
             "semana": semana,
             "enfermedad": enfermedad,
             "casos_esperados": casos_esperados,
+            "casos_esperados_redondeados": casos_redondeados,
+            "umbrales": [round(float(x), 1) for x in th],
             "prediccion_regional": round(pred_region, 2),
             "participacion_pct": round(share * 100, 2),
             "nivel_riesgo": nivel_riesgo,
@@ -197,8 +202,10 @@ class InferenceEngine:
         for mid, info in self.municipios_coords.items():
             casos_esperados = round(pred_region * shares.get(mid, 1.0 / 12.0), 2)
             thresholds = self.thresholds_municipio.get(f"{mid}|{enfermedad}") or thresholds_region
+            # Mismo criterio que predict_municipio y que la evaluación: casos esperados redondeados
+            casos_redondeados = int(np.round(casos_esperados))
             risk_index = min(
-                int(np.searchsorted(thresholds, casos_esperados, side="left")),
+                int(np.searchsorted(thresholds, casos_redondeados, side="left")),
                 len(self.labels) - 1,
             )
             results.append({
@@ -209,6 +216,7 @@ class InferenceEngine:
                 "semana": semana_prediccion,
                 "enfermedad": enfermedad,
                 "casos_esperados": casos_esperados,
+                "casos_esperados_redondeados": casos_redondeados,
                 "nivel_riesgo": self.labels[risk_index],
             })
 

@@ -13,6 +13,8 @@ class PredictionResponse(BaseModel):
     semana: str
     enfermedad: str
     casos_esperados: float
+    casos_esperados_redondeados: Optional[int] = None
+    umbrales: Optional[List[float]] = None  # cortes [bajo/medio, medio/alto, alto/crítico] del municipio
     prediccion_regional: Optional[float] = None
     participacion_pct: Optional[float] = None
     nivel_riesgo: str
@@ -27,6 +29,7 @@ class BulkPredictionItem(BaseModel):
     semana: str
     enfermedad: str
     casos_esperados: float
+    casos_esperados_redondeados: Optional[int] = None
     nivel_riesgo: str
 
 

@@ -159,7 +159,7 @@ def seed_usuarios(db):
                 institucion=u.get("institucion"),
                 cedula=u.get("cedula"),
                 verificado=u.get("verificado", True),
-                created_at=datetime.datetime.utcnow()
+                created_at=datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
             )
             db.add(user)
 
@@ -181,6 +181,12 @@ def seed_predicciones(db, municipios_validos):
                 res = inference_engine.predict_municipio(mid, enfermedad=enf)
                 semana = res["semana"]
 
+                # Reemplazar la predicción de esa semana (el seed puede re-ejecutarse tras reentrenar)
+                db.query(Prediccion).filter(
+                    Prediccion.municipio_id == mid,
+                    Prediccion.semana == semana,
+                    Prediccion.enfermedad == enf
+                ).delete()
                 existing = db.query(Prediccion).filter(
                     Prediccion.municipio_id == mid,
                     Prediccion.semana == semana,
@@ -195,7 +201,7 @@ def seed_predicciones(db, municipios_validos):
                         casos_esperados=res["casos_esperados"],
                         nivel_riesgo=res["nivel_riesgo"],
                         shap_top3=json.dumps(res["shap_top3"], ensure_ascii=False),
-                        created_at=datetime.datetime.utcnow()
+                        created_at=datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
                     )
                     db.add(pred)
                     count += 1
@@ -215,7 +221,7 @@ def seed_alertas(db):
             nivel="medio",
             mensaje="Vigilancia activa de Dengue en Región Centro ante temporada de transición estacional.",
             activa=True,
-            created_at=datetime.datetime.utcnow()
+            created_at=datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
         )
         db.add(alerta)
         db.commit()
