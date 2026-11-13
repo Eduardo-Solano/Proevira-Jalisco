@@ -255,6 +255,7 @@ class ApiClient:
         municipio_id: str,
         enfermedad: str = "dengue",
         semanas: int = 12,
+        horizonte: int = 1,
     ) -> Dict[str, Any]:
         enfermedad_api = self._enfermedad_api(enfermedad)
         if DEMO_MODE:
@@ -272,12 +273,17 @@ class ApiClient:
                 {"semana": "2026-W15", "casos": base + 74, "nivel": "alto"},
                 {"semana": "2026-W16", "casos": base + 89, "nivel": "crítico"},
             ]
-            return {"historico": historico[-semanas:], "prediccion": prediccion}
+            return {"historico": historico[-semanas:], "prediccion": prediccion[:horizonte]}
 
         return self._request(
             "GET",
             "/predictions/history",
-            params={"municipio": municipio_id, "enfermedad": enfermedad_api, "semanas": semanas},
+            params={
+                "municipio": municipio_id,
+                "enfermedad": enfermedad_api,
+                "semanas": semanas,
+                "horizonte": horizonte,
+            },
         )
 
     def get_prediction_explain(

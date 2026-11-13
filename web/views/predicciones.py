@@ -6,7 +6,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
-from api_client import DEMO_MODE, api, MUNICIPIOS_JALISCO
+from api_client import api, MUNICIPIOS_JALISCO
 
 
 def render_predicciones_view():
@@ -35,26 +35,27 @@ def render_predicciones_view():
         )
 
     with f3:
-        horizontes = [1, 2, 3, 4] if DEMO_MODE else [1]
         horizonte = st.selectbox(
-            "Horizonte de predicción",
-            horizontes,
+            "Semanas a predecir",
+            [1, 2, 3, 4],
             format_func=lambda n: f"{n} semana{'s' if n != 1 else ''}",
             key="pred_horizon",
         )
 
-    semanas = st.slider("Semanas históricas para comparar", 8, 24, 12, 2, key="pred_sem")
-
-    hist_data = api.get_prediction_history(mun, enfermedad=enf, semanas=semanas)
+    hist_data = api.get_prediction_history(mun, enfermedad=enf, semanas=4, horizonte=horizonte)
     shap_data = api.get_prediction_explain(mun, enfermedad=enf)
     model_info = api.get_model_info()
     metricas_modelo = api.get_model_metrics()
+    predicciones = hist_data.get("prediccion", [])
     st.markdown("#### Modelo y horizonte")
     model_col, data_col, training_col, forecast_col = st.columns(4)
     model_col.metric("Modelo", model_info.get("modelo", "Random Forest"))
     data_col.metric("Última semana observada", model_info.get("ultima_semana_datos") or "No disponible")
     training_col.metric("Entrenamiento", model_info.get("fecha_entrenamiento") or "No disponible")
-    forecast_col.metric("Semana proyectada", model_info.get("semana_prediccion") or "No disponible")
+    forecast_col.metric(
+        "Última semana proyectada",
+        predicciones[-1]["semana"] if predicciones else "No disponible",
+    )
 
     # ── Curva epidemiológica ──
     st.markdown("#### Casos históricos y proyección")
@@ -91,7 +92,11 @@ def render_predicciones_view():
             margin=dict(l=10, r=10, t=20, b=10),
         )
         st.plotly_chart(fig, use_container_width=True)
-    st.caption("La línea continua representa valores históricos; la línea discontinua son proyecciones, no casos confirmados.")
+        st.caption(
+            "Se muestran las últimas 4 semanas observadas y la proyección solicitada. "
+            "Las proyecciones posteriores a la primera son recursivas: actualizan casos y semana, "
+            "y mantienen fijos los indicadores de defunciones y edades del último dato. No son casos confirmados."
+        )
 
     # ── Métricas disponibles ──
     st.markdown("#### Evaluación del modelo")

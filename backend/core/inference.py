@@ -215,12 +215,20 @@ class InferenceEngine:
         results.sort(key=lambda x: x["casos_esperados"], reverse=True)
         return results
 
-    def get_history(self, municipio_id: str, enfermedad: str = "dengue", semanas: int = 12) -> Dict[str, Any]:
+    def get_history(
+        self,
+        municipio_id: str,
+        enfermedad: str = "dengue",
+        semanas: int = 12,
+        horizonte: int = 1,
+    ) -> Dict[str, Any]:
         """
-        Devuelve el histórico reciente y la proyección siguiente para graficar tendencias.
+        Devuelve el histórico reciente y hasta cuatro semanas de proyección recursiva.
         """
         if not self.loaded:
             self.load()
+            if not self.loaded:
+                raise RuntimeError("El modelo predictivo no está disponible")
 
         municipio_id = str(municipio_id)
         if len(municipio_id) == 3:
@@ -231,18 +239,70 @@ class InferenceEngine:
             (self.raw_data["enfermedad"] == enfermedad)
         ].sort_values("fecha_inicio_semana")
 
+        if df.empty:
+            return {
+                "municipio": municipio_id,
+                "enfermedad": enfermedad,
+                "historico": [],
+                "prediccion": [],
+            }
+
         ultimas = df.tail(semanas)
         historico = [
             {"semana": row["semana"], "casos": int(row["casos"])}
             for _, row in ultimas.iterrows()
         ]
 
-        pred = self.predict_municipio(municipio_id, enfermedad=enfermedad)
-        proyeccion = [{
-            "semana": pred["semana"],
-            "casos": pred["casos_esperados"],
-            "nivel": pred["nivel_riesgo"]
-        }]
+        features, ref_date = self._get_region_features(enfermedad)
+        region = (
+            self.raw_data[self.raw_data["enfermedad"] == enfermedad]
+            .groupby(["fecha_inicio_semana", "sem"], as_index=False)["casos"]
+            .sum()
+            .sort_values("fecha_inicio_semana")
+        )
+        recent_cases = region["casos"].astype(float).tolist()
+        shares = self.participacion_municipal.get(enfermedad, {})
+        share = shares.get(municipio_id, 1.0 / 12.0)
+        thresholds = self.thresholds_municipio.get(f"{municipio_id}|{enfermedad}")
+        if not thresholds:
+            thresholds = self.thresholds_region.get(enfermedad, [1.0, 5.0, 15.0])
+
+        proyeccion = []
+        for offset in range(1, horizonte + 1):
+            log_pred = float(self.reg_region.predict(features)[0])
+            pred_region = max(0.0, float(np.expm1(log_pred)))
+            casos_esperados = round(pred_region * share, 2)
+            risk_index = min(
+                int(np.searchsorted(thresholds, casos_esperados, side="left")),
+                len(self.labels) - 1,
+            )
+            target_date = ref_date + pd.Timedelta(days=7 * offset)
+            iso = target_date.isocalendar()
+            proyeccion.append({
+                "semana": f"{iso.year}-W{iso.week:02d}",
+                "casos": casos_esperados,
+                "nivel": self.labels[risk_index],
+            })
+
+            recent_cases.append(pred_region)
+            case_window = recent_cases[-8:]
+            log_window = [float(np.log1p(value)) for value in case_window]
+            for lag in range(8):
+                lag_value = log_window[-1 - lag] if lag < len(log_window) else 0.0
+                features.loc[:, f"rlog_lag{lag}"] = lag_value
+
+            mean_4 = float(np.mean(case_window[-4:]))
+            mean_8 = float(np.mean(case_window))
+            features.loc[:, "rmedia_4s"] = mean_4
+            features.loc[:, "rmedia_8s"] = mean_8
+            features.loc[:, "rmax_8s"] = float(np.max(case_window))
+            features.loc[:, "rtend"] = (
+                float(features["rlog_lag0"].iloc[0]) - float(features["rlog_lag4"].iloc[0])
+            )
+            features.loc[:, "rtend_rel"] = (mean_4 - mean_8) / (mean_8 + 1)
+            sem = int(iso.week)
+            features.loc[:, "sem_sin"] = np.sin(2 * np.pi * sem / 52)
+            features.loc[:, "sem_cos"] = np.cos(2 * np.pi * sem / 52)
 
         return {
             "municipio": municipio_id,

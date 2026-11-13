@@ -90,12 +90,18 @@ def get_predictions_history(
     municipio: str = Query("14039", description="Clave municipio"),
     enfermedad: str = Query("dengue", description="dengue, influenza o covid"),
     semanas: int = Query(12, ge=4, le=52),
+    horizonte: int = Query(1, ge=1, le=4, description="Número de semanas a proyectar"),
     current_user: dict = Depends(require_roles(["funcionario", "medico"]))
 ):
     """
-    Serie histórica observada + proyección del modelo para graficar tendencias en Streamlit o Móvil.
+    Serie histórica observada + proyección semanal recursiva para graficar tendencias en Streamlit o Móvil.
     """
-    res = inference_engine.get_history(municipio, enfermedad=enfermedad, semanas=semanas)
+    res = inference_engine.get_history(
+        municipio,
+        enfermedad=enfermedad,
+        semanas=semanas,
+        horizonte=horizonte,
+    )
     return PredictionHistoryResponse(**res)
 
 
