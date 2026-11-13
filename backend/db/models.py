@@ -78,6 +78,36 @@ class Alerta(Base):
     municipio_rel = relationship("Municipio", back_populates="alertas")
 
 
+class AlertaPredictivaBorrador(Base):
+    __tablename__ = "alertas_predictivas_borrador"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    municipio_id = Column(String(10), ForeignKey("municipios.id"), nullable=False, index=True)
+    semana = Column(String(15), nullable=False, index=True)
+    enfermedad = Column(String(20), nullable=False, index=True)
+    nivel = Column(String(20), nullable=False)
+    casos_esperados = Column(Float, nullable=False)
+    mensaje = Column(Text, nullable=False)
+    estado = Column(String(20), default="pendiente", nullable=False, index=True)
+    alerta_id = Column(Integer, ForeignKey("alertas.id"), nullable=True)
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
+        nullable=False,
+    )
+    reviewed_at = Column(DateTime, nullable=True)
+    reviewed_by = Column(String(128), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "municipio_id",
+            "semana",
+            "enfermedad",
+            name="uq_alerta_predictiva_muni_sem_enf",
+        ),
+    )
+
+
 class Usuario(Base):
     __tablename__ = "usuarios"
 

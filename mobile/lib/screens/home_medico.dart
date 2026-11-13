@@ -26,26 +26,34 @@ class HomeMedico extends StatefulWidget {
 }
 
 class _HomeMedicoState extends State<HomeMedico> {
+  static const Map<String, String> _municipiosCentro = {
+    '14039': 'Guadalajara',
+    '14120': 'Zapopan',
+    '14098': 'San Pedro Tlaquepaque',
+    '14101': 'Tonalá',
+    '14097': 'Tlajomulco de Zúñiga',
+    '14070': 'El Salto',
+    '14124': 'Zapotlanejo',
+    '14044': 'Ixtlahuacán de los Membrillos',
+    '14045': 'Ixtlahuacán del Río',
+    '14051': 'Juanacatlán',
+    '14029': 'Cuquío',
+    '14071': 'San Cristóbal de la Barranca',
+  };
+  static const List<String> _enfermedades = ['dengue', 'influenza', 'covid'];
+
   int index = 0;
-  final municipio = TextEditingController(text: '14039');
+  String selectedMunicipio = '14039';
+  String selectedEnfermedad = 'dengue';
   Prediccion? prediction;
   String? error;
 
-  @override
-  void dispose() {
-    municipio.dispose();
-    super.dispose();
-  }
-
   Future<void> consult() async {
     setState(() => error = null);
-    final now = DateTime.now();
-    final week =
-        '${now.year}-W${((now.difference(DateTime(now.year, 1, 1)).inDays) ~/ 7 + 1).toString().padLeft(2, '0')}';
     try {
       final result = await widget.api.getPrediction(
-        municipio: municipio.text.trim(),
-        semana: week,
+        municipio: selectedMunicipio,
+        enfermedad: selectedEnfermedad,
       );
       if (mounted) setState(() => prediction = result);
     } catch (exception) {
@@ -59,13 +67,38 @@ class _HomeMedicoState extends State<HomeMedico> {
           Text('Consulta de riesgo municipal',
               style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
-          TextField(
-            controller: municipio,
-            keyboardType: TextInputType.number,
+          DropdownButtonFormField<String>(
+            value: selectedMunicipio,
             decoration: const InputDecoration(
-              labelText: 'ID del municipio',
+              labelText: 'Municipio (Región Centro)',
               border: OutlineInputBorder(),
             ),
+            items: _municipiosCentro.entries
+                .map((e) => DropdownMenuItem(
+                      value: e.key,
+                      child: Text('${e.value} (${e.key})'),
+                    ))
+                .toList(),
+            onChanged: (v) {
+              if (v != null) setState(() => selectedMunicipio = v);
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: selectedEnfermedad,
+            decoration: const InputDecoration(
+              labelText: 'Enfermedad',
+              border: OutlineInputBorder(),
+            ),
+            items: _enfermedades
+                .map((e) => DropdownMenuItem(
+                      value: e,
+                      child: Text(e.toUpperCase()),
+                    ))
+                .toList(),
+            onChanged: (v) {
+              if (v != null) setState(() => selectedEnfermedad = v);
+            },
           ),
           const SizedBox(height: 12),
           FilledButton.icon(

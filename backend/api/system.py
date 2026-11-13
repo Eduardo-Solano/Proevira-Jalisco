@@ -1,6 +1,7 @@
 import os
 import json
-from fastapi import APIRouter, Depends
+import pandas as pd
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from backend.db.database import get_db
@@ -40,10 +41,64 @@ def version_info():
         except Exception:
             pass
 
+    latest_week = None
+    predicted_week = None
+    per_disease = {}
+    if inference_engine.loaded and inference_engine.raw_data is not None:
+        raw_df = inference_engine.raw_data
+        latest_date = raw_df["fecha_inicio_semana"].max()
+        if not pd.isna(latest_date):
+            latest_week = str(raw_df.loc[
+                raw_df["fecha_inicio_semana"] == latest_date,
+                "semana",
+            ].iloc[0])
+            next_week = (pd.Timestamp(latest_date) + pd.Timedelta(days=7)).isocalendar()
+            predicted_week = f"{next_week.year}-W{next_week.week:02d}"
+
+        for enf, sub in raw_df.groupby("enfermedad"):
+            dt_enf = sub["fecha_inicio_semana"].max()
+            if pd.isna(dt_enf):
+                continue
+            sem_obs = str(sub.loc[sub["fecha_inicio_semana"] == dt_enf, "semana"].iloc[0])
+            nxt_iso = (pd.Timestamp(dt_enf) + pd.Timedelta(days=7)).isocalendar()
+            per_disease[str(enf)] = {
+                "ultima_semana_datos": sem_obs,
+                "semana_prediccion": f"{nxt_iso.year}-W{nxt_iso.week:02d}",
+            }
+
     return {
         "api": "1.0",
-        "modelo": "rf-regresor-regional-v1",
+        "modelo": "rf-municipal-v2",
         "fecha_entrenamiento": fecha_entrenamiento,
+        "ultima_semana_datos": latest_week,
+        "semana_prediccion": predicted_week,
+        "por_enfermedad": per_disease,
         "sistema": settings.PROJECT_NAME
     }
 
+
+@router.get("/model/metrics")
+def model_metrics():
+    """Publica las métricas de evaluación generadas por model/train.py."""
+    metricas_path = os.path.join(settings.MODEL_ARTIFACTS_DIR, "metricas.json")
+    if not os.path.exists(metricas_path):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No se encontraron métricas de entrenamiento. Ejecuta model/train.py.",
+        )
+
+    try:
+        with open(metricas_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No se pudieron leer las métricas del modelo.",
+        ) from error
+
+    return {
+        "fecha_entrenamiento": data.get("fecha_entrenamiento"),
+        "arquitectura": data.get("arquitectura", "rf-municipal-v2"),
+        "split": data.get("split", {}),
+        "test": data.get("test", {}),
+    }

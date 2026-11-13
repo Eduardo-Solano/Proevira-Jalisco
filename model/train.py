@@ -1,11 +1,15 @@
-"""Entrenamiento reproducible: pronóstico SEMANAL regional + reparto municipal, con riesgo derivado del pronóstico.
+"""Entrenamiento reproducible: pronóstico SEMANAL directo por municipio y enfermedad (t+1).
 
-Diseño (las series municipales semanales son casi todo ceros; la región sí tiene señal):
-  1. Modelo regional: RandomForestRegressor sobre log1p(casos de la región Centro) -> casos de t+1.
-  2. Municipio: casos_esperados = pronóstico_regional * participación municipal (últimas 12 semanas).
-  3. Riesgo (bajo/medio/alto/crítico): se obtiene comparando los casos esperados (redondeados) con cortes
-     de cuantiles 50/75/90 de las últimas 104 semanas de train -> siempre coherente con los casos esperados.
-  4. Comparación contra persistencia y SARIMA(1,0,1). Todo con información hasta la semana t.
+Arquitectura sin reparto regional ni fuga de datos:
+  1. Un RandomForestRegressor dedicado por enfermedad (dengue, influenza, covid)
+     sobre log1p(casos_municipio) de la semana t+1.
+  2. Features construidas exclusivamente hasta la semana t dentro de cada serie
+     (municipio_id, enfermedad) y en el rango real de fechas de esa patología.
+  3. Split cronológico independiente por enfermedad (último 20% de semanas como test)
+     garantizando fecha_train < cut - 7 días para que el objetivo t+1 no toque test.
+  4. Riesgo (bajo/medio/alto/crítico) derivado de int(round(casos_esperados)) frente a
+     cuantiles 50/75/90 de las últimas 104 semanas de train del mismo municipio y enfermedad.
+  5. Comparación directa por municipio contra persistencia y SARIMA(1,0,1).
 
 Uso: python model/train.py
 Salidas: model/artifacts/{modelo_rf.pkl,feature_names.json,metricas.json}, model/docs/shap_summary.png
@@ -16,295 +20,417 @@ import warnings
 from datetime import datetime
 
 import joblib
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    HAS_PLT = True
+except ImportError:
+    plt = None
+    HAS_PLT = False
 import numpy as np
 import pandas as pd
 import shap
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import confusion_matrix, f1_score, mean_absolute_error, mean_squared_error
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    f1_score,
+    mean_absolute_error,
+    mean_squared_error,
+)
 from sklearn.model_selection import TimeSeriesSplit
-from statsmodels.tsa.statespace.sarimax import SARIMAX
+try:
+    from statsmodels.tsa.statespace.sarimax import SARIMAX
+    HAS_SARIMA = True
+except ImportError:
+    SARIMAX = None
+    HAS_SARIMA = False
 
 warnings.filterwarnings("ignore")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA = os.path.join(ROOT, "data", "clean", "casos_municipio_semana.parquet")
+DATA = os.path.join(ROOT, "data", "clean", "casos_municipio_semana.csv")
 ART = os.path.join(ROOT, "model", "artifacts")
 DOCS = os.path.join(ROOT, "model", "docs")
+
+ENFERMEDADES = ("dengue", "influenza", "covid")
 LABELS = ["bajo", "medio", "alto", "crítico"]
-ENF = {"dengue": 0, "influenza": 1, "covid": 2}
 EDADES = ["edad_0_14", "edad_15_44", "edad_45_64", "edad_65_mas"]
 TEST_FRAC = 0.2
-QS = (0.5, 0.75, 0.9)    # cuantiles de los cortes de riesgo
-WINDOW = 104             # semanas recientes de train usadas para los cortes (y para SARIMA)
-SHARE_WEEKS = 12         # ventana de la participación municipal
+QS = (0.5, 0.75, 0.9)
+WINDOW = 104
 SEED = 42
 WEEK = pd.Timedelta(days=7)
 
-# --------------------------------------------------------------------------- features regionales
-REG_FEATURES = ([f"rlog_lag{k}" for k in range(8)] + ["rmedia_4s", "rmedia_8s", "rmax_8s", "rtend", "rtend_rel",
-                "rdef_4s"] + [f"rtasa_{e}" for e in EDADES] + ["sem_sin", "sem_cos", "enfermedad_cod"])
+FEATURES = (
+    [f"lag{k}" for k in range(8)]
+    + [f"log_lag{k}" for k in range(8)]
+    + ["media_4s", "media_8s", "max_8s", "std_8s", "tendencia", "tendencia_rel", "def_4s"]
+    + [f"tasa_{e}" for e in EDADES]
+    + ["sem_sin", "sem_cos", "mun_cod"]
+)
+
+GRID_PARAMS = [
+    {"max_depth": d, "min_samples_leaf": l, "max_features": f}
+    for d in (None, 8, 12)
+    for l in (1, 3, 5)
+    for f in ("sqrt", 0.5)
+]
 
 
-def build_region(raw: pd.DataFrame) -> pd.DataFrame:
-    """Serie semanal de la región (suma de municipios) por enfermedad, con features hasta la semana t."""
-    cols = ["casos", "defunciones"] + EDADES
-    r = raw.groupby(["enfermedad", "fecha_inicio_semana", "sem"], as_index=False)[cols].sum()
-    r = r.sort_values(["enfermedad", "fecha_inicio_semana"]).reset_index(drop=True)
-    g = r.groupby("enfermedad", sort=False)
-    r["rlog"] = np.log1p(r["casos"])
+def load_raw(path: str = DATA) -> pd.DataFrame:
+    df = pd.read_csv(path, dtype={"municipio_id": str}, parse_dates=["fecha_inicio_semana"])
+    df["municipio_id"] = df["municipio_id"].astype(str).str.zfill(5)
+    df["enfermedad"] = df["enfermedad"].astype(str).str.lower()
+    return df.sort_values(["enfermedad", "municipio_id", "fecha_inicio_semana"]).reset_index(drop=True)
+
+
+def build_mun_map(raw: pd.DataFrame) -> dict:
+    mids = sorted(raw["municipio_id"].astype(str).unique())
+    return {mid: idx for idx, mid in enumerate(mids)}
+
+
+def build_features(raw: pd.DataFrame, mun_cod_map: dict, with_target: bool = True) -> pd.DataFrame:
+    """Construye features municipales hasta la semana t dentro de cada (municipio_id, enfermedad)."""
+    df = raw.sort_values(["enfermedad", "municipio_id", "fecha_inicio_semana"]).copy()
+    g = df.groupby(["enfermedad", "municipio_id"], sort=False)
+
     for k in range(8):
-        r[f"rlog_lag{k}"] = g["rlog"].shift(k)
-    r["rmedia_4s"] = g["casos"].transform(lambda s: s.rolling(4).mean())
-    r["rmedia_8s"] = g["casos"].transform(lambda s: s.rolling(8).mean())
-    r["rmax_8s"] = g["casos"].transform(lambda s: s.rolling(8).max())
-    r["rtend"] = r["rlog_lag0"] - r["rlog_lag4"]
-    r["rtend_rel"] = (r["rmedia_4s"] - r["rmedia_8s"]) / (r["rmedia_8s"] + 1)
-    r["rdef_4s"] = g["defunciones"].transform(lambda s: s.rolling(4).sum())
-    tot4 = g["casos"].transform(lambda s: s.rolling(4).sum())
+        df[f"lag{k}"] = g["casos"].shift(k)
+        df[f"log_lag{k}"] = np.log1p(df[f"lag{k}"])
+
+    df["media_4s"] = g["casos"].transform(lambda s: s.rolling(4).mean())
+    df["media_8s"] = g["casos"].transform(lambda s: s.rolling(8).mean())
+    df["max_8s"] = g["casos"].transform(lambda s: s.rolling(8).max())
+    df["std_8s"] = g["casos"].transform(lambda s: s.rolling(8).std(ddof=0))
+    df["tendencia"] = df["log_lag0"] - df["log_lag4"]
+    df["tendencia_rel"] = (df["media_4s"] - df["media_8s"]) / (df["media_8s"] + 1.0)
+    df["def_4s"] = g["defunciones"].transform(lambda s: s.rolling(4).sum())
+
+    tot4 = g["casos"].transform(lambda s: s.rolling(4).sum()).replace(0, np.nan)
     for e in EDADES:
-        r[f"rtasa_{e}"] = (g[e].transform(lambda s: s.rolling(4).sum()) / tot4.replace(0, np.nan)).fillna(0)
-    r["sem_sin"] = np.sin(2 * np.pi * r["sem"] / 52)
-    r["sem_cos"] = np.cos(2 * np.pi * r["sem"] / 52)
-    r["enfermedad_cod"] = r["enfermedad"].map(ENF)
-    r["rsum_share"] = g["casos"].transform(lambda s: s.rolling(SHARE_WEEKS).sum())
-    r["casos_next"] = g["casos"].shift(-1)
-    r["rlog_next"] = g["rlog"].shift(-1)
-    return r
+        df[f"tasa_{e}"] = (g[e].transform(lambda s: s.rolling(4).sum()) / tot4).fillna(0.0)
 
+    df["sem_sin"] = np.sin(2.0 * np.pi * df["sem"] / 52.0)
+    df["sem_cos"] = np.cos(2.0 * np.pi * df["sem"] / 52.0)
+    df["mun_cod"] = df["municipio_id"].map(mun_cod_map).astype(float)
 
-def build_muni(raw: pd.DataFrame, region: pd.DataFrame) -> pd.DataFrame:
-    """Por municipio: casos actuales (persistencia), participación de las últimas SHARE_WEEKS y objetivo t+1."""
-    df = raw.sort_values(["municipio_id", "enfermedad", "fecha_inicio_semana"]).copy()
-    g = df.groupby(["municipio_id", "enfermedad"], sort=False)
-    df["casos_lag0"] = df["casos"]
-    df["sum_share"] = g["casos"].transform(lambda s: s.rolling(SHARE_WEEKS).sum())
-    df["casos_next"] = g["casos"].shift(-1)
-    df = df.merge(region[["enfermedad", "fecha_inicio_semana", "rsum_share"]], on=["enfermedad", "fecha_inicio_semana"], how="left")
-    n_mun = raw["municipio_id"].nunique()
-    df["share"] = np.where(df["rsum_share"] > 0, df["sum_share"] / df["rsum_share"].replace(0, np.nan), 1.0 / n_mun)
+    if with_target:
+        df["casos_next"] = g["casos"].shift(-1)
+        df["log_next"] = np.log1p(df["casos_next"])
+
     return df
 
 
-def ultima_participacion(raw: pd.DataFrame) -> dict:
-    """Participación municipal vigente (última semana disponible) por enfermedad; la usa el backend."""
+def thresholds(df_hist: pd.DataFrame, window: int = WINDOW) -> dict:
+    """Cortes [b1, b2, b3] por 'municipio_id|enfermedad' sobre cuantiles QS de train."""
     out = {}
-    for e, d in raw.groupby("enfermedad"):
-        ult = d["fecha_inicio_semana"].sort_values().unique()[-SHARE_WEEKS:]
-        s = d[d["fecha_inicio_semana"].isin(ult)].groupby("municipio_id")["casos"].sum()
-        out[e] = (s / s.sum()).to_dict() if s.sum() > 0 else {m: 1 / len(s) for m in s.index}
-    return out
-
-
-# --------------------------------------------------------------------------- riesgo / métricas
-def thresholds(train: pd.DataFrame, by: list, window=WINDOW) -> dict:
-    """Cortes [b1,b2,b3] por grupo con cuantiles QS de las últimas `window` semanas."""
-    out = {}
-    for k, s in train.sort_values("fecha_inicio_semana").groupby(by)["casos"]:
+    for (mid, enf), s in df_hist.sort_values("fecha_inicio_semana").groupby(["municipio_id", "enfermedad"])["casos"]:
         b1, b2, b3 = np.quantile(s.tail(window), QS)
         b1 = float(b1)
-        b2 = float(max(b2, b1 + 1))
-        b3 = float(max(b3, b2 + 1))
-        out["|".join(k) if isinstance(k, tuple) else k] = [b1, b2, b3]
+        b2 = float(max(b2, b1 + 1.0))
+        b3 = float(max(b3, b2 + 1.0))
+        out[f"{mid}|{enf}"] = [b1, b2, b3]
     return out
 
 
-def to_class(casos, keys, th) -> np.ndarray:
+def to_class(casos, keys, th: dict) -> np.ndarray:
     return np.array([int(np.searchsorted(th[k], c, side="left")) for c, k in zip(casos, keys)])
 
 
-def mkey(d):
-    return (d["municipio_id"] + "|" + d["enfermedad"]).values
+def mkey(df: pd.DataFrame) -> np.ndarray:
+    return (df["municipio_id"] + "|" + df["enfermedad"]).values
 
 
-def reporte(y_true, y_pred) -> dict:
-    return {"f1_macro": float(f1_score(y_true, y_pred, average="macro", labels=range(4), zero_division=0)),
-            "f1_por_clase": dict(zip(LABELS, map(float, f1_score(y_true, y_pred, average=None, labels=range(4), zero_division=0)))),
-            "matriz_confusion": confusion_matrix(y_true, y_pred, labels=range(4)).tolist()}
+def cls_report(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
+    return {
+        "exactitud": float(accuracy_score(y_true, y_pred)),
+        "f1_macro": float(f1_score(y_true, y_pred, average="macro", labels=range(4), zero_division=0)),
+        "f1_por_clase": dict(
+            zip(LABELS, map(float, f1_score(y_true, y_pred, average=None, labels=range(4), zero_division=0)))
+        ),
+        "matriz_confusion": confusion_matrix(y_true, y_pred, labels=range(4)).tolist(),
+    }
 
 
-def mae(a, b):
+def mae(a, b) -> float:
     return float(mean_absolute_error(a, b))
 
 
-def rmse(a, b):
+def rmse(a, b) -> float:
     return float(np.sqrt(mean_squared_error(a, b)))
 
 
-# --------------------------------------------------------------------------- modelo
-def make_reg(p, n=300):
-    return RandomForestRegressor(n_estimators=n, n_jobs=-1, random_state=SEED, **p)
+def make_reg(params: dict, n_estimators: int = 300) -> RandomForestRegressor:
+    return RandomForestRegressor(n_estimators=n_estimators, n_jobs=-1, random_state=SEED, **params)
 
 
-GRID_REG = [{"max_depth": d, "min_samples_leaf": l, "max_features": f}
-            for d in (None, 8) for l in (1, 3, 5) for f in ("sqrt", 0.5)]
+def tune_disease(tr: pd.DataFrame) -> tuple:
+    """Selección de hiperparámetros por TimeSeriesSplit (sin fuga) minimizando MAE en log1p."""
+    tr_s = tr.sort_values(["fecha_inicio_semana", "municipio_id"]).reset_index(drop=True)
+    results = []
+    for params in GRID_PARAMS:
+        fold_scores = []
+        for idx_tr, idx_val in TimeSeriesSplit(n_splits=5).split(tr_s):
+            m = make_reg(params, n_estimators=150).fit(tr_s.loc[idx_tr, FEATURES], tr_s.loc[idx_tr, "log_next"])
+            pred_val = m.predict(tr_s.loc[idx_val, FEATURES])
+            fold_scores.append(mae(tr_s.loc[idx_val, "log_next"], pred_val))
+        results.append({**params, "cv_mae_log": float(np.mean(fold_scores))})
+    best = min(results, key=lambda r: r["cv_mae_log"])
+    return {k: best[k] for k in ("max_depth", "min_samples_leaf", "max_features")}, results
 
 
-def tune_region(rtr: pd.DataFrame) -> tuple:
-    """Hiperparámetros del modelo regional por TimeSeriesSplit (MAE en log1p), solo con train."""
-    rtr = rtr.sort_values("fecha_inicio_semana").reset_index(drop=True)
-    res = []
-    for p in GRID_REG:
-        sc = []
-        for a, b in TimeSeriesSplit(n_splits=5).split(rtr):
-            m = make_reg(p, 150).fit(rtr.loc[a, REG_FEATURES], rtr.loc[a, "rlog_next"])
-            sc.append(mae(rtr.loc[b, "rlog_next"], m.predict(rtr.loc[b, REG_FEATURES])))
-        res.append({**p, "cv_mae_log": float(np.mean(sc))})
-    best = min(res, key=lambda r: r["cv_mae_log"])
-    return {k: best[k] for k in ("max_depth", "min_samples_leaf", "max_features")}, res
+def fit_disease(tr: pd.DataFrame, params: dict) -> RandomForestRegressor:
+    return make_reg(params, n_estimators=300).fit(tr[FEATURES], tr["log_next"])
 
 
-def fit_model(rtr, p):
-    return make_reg(p).fit(rtr[REG_FEATURES], rtr["rlog_next"])
-
-
-def predict(model, region_rows, muni_rows):
-    """Casos esperados t+1: regional y municipal (reparto)."""
-    rp = region_rows[["enfermedad", "fecha_inicio_semana"]].copy()
-    rp["pred_region"] = np.clip(np.expm1(model.predict(region_rows[REG_FEATURES])), 0, None)
-    m = muni_rows.merge(rp, on=["enfermedad", "fecha_inicio_semana"], how="left")
-    m["pred_reparto"] = m["pred_region"] * m["share"]
-    assert np.isfinite(m["pred_reparto"]).all() and np.isfinite(rp["pred_region"]).all()
-    return rp, m
-
-
-def sarima_region(region: pd.DataFrame, cut) -> pd.DataFrame:
-    """SARIMA(1,0,1) por enfermedad, ajustado con las últimas WINDOW semanas previas a `cut`."""
+def sarima_municipal(raw_enf: pd.DataFrame, cut: pd.Timestamp) -> pd.DataFrame:
+    """SARIMA(1,0,1) por municipio ajustado solo con las últimas WINDOW semanas < cut."""
     rows = []
-    for e, s in region.groupby("enfermedad"):
+    for mid, s in raw_enf.groupby("municipio_id"):
         s = s.sort_values("fecha_inicio_semana")
         y = s["casos"].astype(float).values
         n_tr = int((s["fecha_inicio_semana"] < cut).sum())
+        train_slice = y[max(0, n_tr - WINDOW):n_tr]
         try:
-            res = SARIMAX(y[max(0, n_tr - WINDOW):n_tr], order=(1, 0, 1), trend="c").fit(disp=False)
-            applied = res.apply(y)
-            fitted = np.asarray(applied.fittedvalues)
-            nxt = np.append(fitted[1:], np.asarray(applied.forecast(1))[0])
+            if not HAS_SARIMA or np.std(train_slice) == 0:
+                nxt = np.append(y[1:], y[-1])
+            else:
+                res = SARIMAX(train_slice, order=(1, 0, 1), trend="c").fit(disp=False)
+                applied = res.apply(y)
+                fitted = np.asarray(applied.fittedvalues)
+                nxt = np.append(fitted[1:], np.asarray(applied.forecast(1))[0])
         except Exception:
             nxt = np.append(y[1:], y[-1])
-        rows.append(pd.DataFrame({"enfermedad": e, "fecha_inicio_semana": s["fecha_inicio_semana"].values,
-                                  "pred_sarima": np.clip(nxt, 0, None)}))
+        rows.append(
+            pd.DataFrame(
+                {
+                    "municipio_id": mid,
+                    "fecha_inicio_semana": s["fecha_inicio_semana"].values,
+                    "pred_sarima": np.clip(nxt, 0.0, None),
+                }
+            )
+        )
     return pd.concat(rows, ignore_index=True)
 
 
-def evaluar(rp, m, region_rows, th_r, th_m, sarima=None):
-    """Métricas regionales y municipales (global y por enfermedad). Riesgo = f(casos esperados)."""
-    rr = region_rows.merge(rp, on=["enfermedad", "fecha_inicio_semana"])
-    if sarima is not None:
-        rr = rr.merge(sarima, on=["enfermedad", "fecha_inicio_semana"])
-    y_true = to_class(rr["casos_next"], rr["enfermedad"].values, th_r)
+def evaluate_predictions(df_eval: pd.DataFrame, th_m: dict) -> dict:
+    """Calcula MAE, RMSE, Exactitud y F1 macro por patología y global."""
+    ym = to_class(df_eval["casos_next"], mkey(df_eval), th_m)
 
-    def reg_block(mask):
-        d, yt = rr[mask], y_true[mask]
-        k = d["enfermedad"].values
-        out = {"n": int(mask.sum()), "casos_medios": float(d["casos_next"].mean()),
-               "rf": {"mae": mae(d["casos_next"], d["pred_region"]), "rmse": rmse(d["casos_next"], d["pred_region"]),
-                      **reporte(yt, to_class(np.round(d["pred_region"]), k, th_r))},
-               "persistencia": {"mae": mae(d["casos_next"], d["casos"]), "rmse": rmse(d["casos_next"], d["casos"]),
-                                **reporte(yt, to_class(d["casos"], k, th_r))}}
-        if "pred_sarima" in d:
-            out["sarima"] = {"mae": mae(d["casos_next"], d["pred_sarima"]), "rmse": rmse(d["casos_next"], d["pred_sarima"]),
-                             **reporte(yt, to_class(np.round(d["pred_sarima"]), k, th_r))}
+    def block(mask: np.ndarray) -> dict:
+        d = df_eval[mask]
+        y = ym[mask]
+        k = mkey(d)
+        pred_rf_round = np.round(d["pred_rf"])
+        out = {
+            "n": int(mask.sum()),
+            "casos_medios": float(d["casos_next"].mean()),
+            "rf": {
+                "mae": mae(d["casos_next"], d["pred_rf"]),
+                "rmse": rmse(d["casos_next"], d["pred_rf"]),
+                **cls_report(y, to_class(pred_rf_round, k, th_m)),
+            },
+            "persistencia": {
+                "mae": mae(d["casos_next"], d["lag0"]),
+                "rmse": rmse(d["casos_next"], d["lag0"]),
+                **cls_report(y, to_class(d["lag0"], k, th_m)),
+            },
+        }
+        if "pred_sarima" in d and d["pred_sarima"].notna().all():
+            out["sarima"] = {
+                "mae": mae(d["casos_next"], d["pred_sarima"]),
+                "rmse": rmse(d["casos_next"], d["pred_sarima"]),
+                **cls_report(y, to_class(np.round(d["pred_sarima"]), k, th_m)),
+            }
         return out
 
-    regional = {"global": reg_block(np.ones(len(rr), bool))}
-    for e in ENF:
-        regional[e] = reg_block((rr["enfermedad"] == e).values)
+    municipal = {"global": block(np.ones(len(df_eval), dtype=bool))}
+    for enf in ENFERMEDADES:
+        mask = (df_eval["enfermedad"] == enf).values
+        if mask.any():
+            municipal[enf] = block(mask)
+    return {"municipal": municipal}
 
-    ym = to_class(m["casos_next"], mkey(m), th_m)
 
-    def mun_block(mask):
-        d, y = m[mask], ym[mask]
-        return {"n": int(mask.sum()), "casos_medios": float(d["casos_next"].mean()),
-                "reparto": {"mae": mae(d["casos_next"], d["pred_reparto"]), "rmse": rmse(d["casos_next"], d["pred_reparto"]),
-                            **reporte(y, to_class(np.round(d["pred_reparto"]), mkey(d), th_m))},
-                "persistencia": {"mae": mae(d["casos_next"], d["casos_lag0"]), "rmse": rmse(d["casos_next"], d["casos_lag0"]),
-                                 **reporte(y, to_class(d["casos_lag0"], mkey(d), th_m))}}
+def compute_shap_importance(models: dict, test_frames: dict) -> tuple:
+    """Calcula mean(|SHAP|) en test para cada patología y promedio global."""
+    shap_por_enf = {}
+    for enf, model in models.items():
+        te = test_frames[enf]
+        muestra = te[FEATURES].sample(min(300, len(te)), random_state=SEED)
+        sv = np.array(shap.TreeExplainer(model).shap_values(muestra))
+        assert sv.shape == (len(muestra), len(FEATURES)), sv.shape
+        vals = np.abs(sv).mean(axis=0)
+        shap_por_enf[enf] = dict(sorted(zip(FEATURES, map(float, vals)), key=lambda x: -x[1]))
 
-    municipal = {"global": mun_block(np.ones(len(m), bool))}
-    for e in ENF:
-        municipal[e] = mun_block((m["enfermedad"] == e).values)
-    return {"regional": regional, "municipal": municipal}
+    global_mean = {
+        feat: float(np.mean([shap_por_enf[enf][feat] for enf in models]))
+        for feat in FEATURES
+    }
+    shap_global = dict(sorted(global_mean.items(), key=lambda x: -x[1]))
+    return shap_por_enf, shap_global
+
+
+def plot_shap_summary(shap_por_enf: dict, shap_global: dict, out_path: str):
+    """Genera resumen visual SHAP por patología y promedio global."""
+    if not HAS_PLT:
+        return
+    top_feats = list(shap_global.keys())[:15][::-1]
+    fig, axes = plt.subplots(1, 3, figsize=(15, 6), sharey=True)
+    colors = {"dengue": "#b54755", "influenza": "#bd9b43", "covid": "#4e9577"}
+    for ax, enf in zip(axes, ENFERMEDADES):
+        vals = [shap_por_enf[enf].get(f, 0.0) for f in top_feats]
+        ax.barh(top_feats, vals, color=colors[enf])
+        ax.set_title(enf.upper(), fontsize=11, fontweight="bold")
+        ax.set_xlabel("mean(|SHAP|) en log1p(casos)")
+        ax.grid(axis="x", alpha=0.25)
+    fig.suptitle("Importancia SHAP por enfermedad - Modelos municipales (test)", fontsize=13, fontweight="bold")
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=150)
+    plt.close(fig)
 
 
 def main():
     os.makedirs(ART, exist_ok=True)
     os.makedirs(DOCS, exist_ok=True)
-    raw = pd.read_parquet(DATA)
-    region = build_region(raw)
-    muni = build_muni(raw, region)
-    rall = region.dropna(subset=REG_FEATURES + ["rlog_next"]).reset_index(drop=True)
-    mall = muni.dropna(subset=["share", "casos_next"]).reset_index(drop=True)
 
-    weeks = np.sort(rall["fecha_inicio_semana"].unique())
-    cut = pd.Timestamp(weeks[int(len(weeks) * (1 - TEST_FRAC))])
+    raw = load_raw(DATA)
+    mun_cod_map = build_mun_map(raw)
+    featured = build_features(raw, mun_cod_map, with_target=True)
+    labeled = featured.dropna(subset=FEATURES + ["log_next"]).reset_index(drop=True)
 
-    def split(d, c):  # train: filas cuyo objetivo (t+1) cae antes de `c` -> sin fuga hacia test
-        return d[d["fecha_inicio_semana"] < c - WEEK], d[d["fecha_inicio_semana"] >= c]
+    best_params = {}
+    grid_summary = {}
+    split_info = {}
+    th_test_all = {}
+    test_models = {}
+    test_frames = {}
+    eval_parts = []
 
-    rtr, rte = split(rall, cut)
-    _, mte = split(mall, cut)
-    th_r = thresholds(region[region["fecha_inicio_semana"] < cut], ["enfermedad"])
-    th_m = thresholds(raw[raw["fecha_inicio_semana"] < cut], ["municipio_id", "enfermedad"])
+    for enf in ENFERMEDADES:
+        d_raw = raw[raw["enfermedad"] == enf]
+        d_enf = labeled[labeled["enfermedad"] == enf].copy()
+        weeks = np.sort(d_enf["fecha_inicio_semana"].unique())
+        cut = pd.Timestamp(weeks[int(len(weeks) * (1.0 - TEST_FRAC))])
 
-    # 1) hiperparámetros: SOLO CV sobre train
-    pr, grid_r = tune_region(rtr)
-    print("hiperparámetros regional:", pr)
+        # Regla estricta anti-fuga: solo filas cuyo objetivo t+1 ocurre antes del corte
+        tr = d_enf[d_enf["fecha_inicio_semana"] < cut - WEEK].copy()
+        te = d_enf[d_enf["fecha_inicio_semana"] >= cut].copy()
 
-    # 2) evaluación en test (modelo entrenado solo con train)
-    model = fit_model(rtr, pr)
-    rp, mp = predict(model, rte, mte)
-    ev = evaluar(rp, mp, rte, th_r, th_m, sarima=sarima_region(region, cut))
+        th_enf = thresholds(d_raw[d_raw["fecha_inicio_semana"] < cut])
+        th_test_all.update(th_enf)
 
-    # 3) SHAP del regresor regional (sobre test)
-    muestra = rte[REG_FEATURES].sample(min(300, len(rte)), random_state=SEED)
-    sv = np.array(shap.TreeExplainer(model).shap_values(muestra))
-    assert sv.shape == (len(muestra), len(REG_FEATURES)), sv.shape
-    shap_global = np.abs(sv).mean(axis=0)
-    order = np.argsort(shap_global)
-    plt.figure(figsize=(8, 7))
-    plt.barh(np.array(REG_FEATURES)[order], shap_global[order], color="#c0392b")
-    plt.xlabel("mean(|SHAP|) sobre log1p(casos)")
-    plt.title("Importancia SHAP - pronóstico semanal regional (test)")
-    plt.tight_layout()
-    plt.savefig(os.path.join(DOCS, "shap_summary.png"), dpi=150)
-    plt.close()
+        params, grid_res = tune_disease(tr)
+        best_params[enf] = params
+        grid_summary[enf] = grid_res
+        print(f"[{enf}] mejores hiperparámetros: {params} | train={len(tr)}, test={len(te)}, cut={cut.date()}")
 
-    # 4) modelo congelado con todo el histórico etiquetado
-    th_r_all = thresholds(region, ["enfermedad"])
-    th_m_all = thresholds(raw, ["municipio_id", "enfermedad"])
-    final = fit_model(rall, pr)
-    joblib.dump({"reg_region": final, "thresholds_region": th_r_all, "thresholds_municipio": th_m_all,
-                 "participacion_municipal": ultima_participacion(raw), "features_region": REG_FEATURES,
-                 "labels": LABELS, "hiperparametros": {"region": pr}, "share_weeks": SHARE_WEEKS,
-                 "ultima_semana": str(pd.Timestamp(raw["fecha_inicio_semana"].max()).date())},
-                os.path.join(ART, "modelo_rf.pkl"))
+        model = fit_disease(tr, params)
+        test_models[enf] = model
+        test_frames[enf] = te
+
+        te["pred_rf"] = np.clip(np.expm1(model.predict(te[FEATURES])), 0.0, None)
+        assert np.isfinite(te["pred_rf"]).all()
+
+        sar = sarima_municipal(d_raw, cut)
+        te = te.merge(sar, on=["municipio_id", "fecha_inicio_semana"], how="left")
+        eval_parts.append(te)
+
+        split_info[enf] = {
+            "corte_test": str(cut.date()),
+            "filas_train": int(len(tr)),
+            "filas_test": int(len(te)),
+            "rango_raw": f"{d_raw['semana'].min()} -> {d_raw['semana'].max()}",
+        }
+
+    eval_df = pd.concat(eval_parts, ignore_index=True)
+    ev = evaluate_predictions(eval_df, th_test_all)
+
+    shap_por_enf, shap_global = compute_shap_importance(test_models, test_frames)
+    plot_shap_summary(shap_por_enf, shap_global, os.path.join(DOCS, "shap_summary.png"))
+
+    # Modelos finales congelados con todo el histórico etiquetado de cada enfermedad
+    models_final = {}
+    native_por_enf = {}
+    ultima_fecha_enf = {}
+    ultima_iso_enf = {}
+    for enf in ENFERMEDADES:
+        d_full = labeled[labeled["enfermedad"] == enf]
+        m_final = fit_disease(d_full, best_params[enf])
+        models_final[enf] = m_final
+        native_por_enf[enf] = dict(sorted(zip(FEATURES, map(float, m_final.feature_importances_)), key=lambda x: -x[1]))
+
+        d_raw = raw[raw["enfermedad"] == enf]
+        last_dt = pd.Timestamp(d_raw["fecha_inicio_semana"].max())
+        ultima_fecha_enf[enf] = str(last_dt.date())
+        ultima_iso_enf[enf] = str(
+            d_raw.loc[d_raw["fecha_inicio_semana"] == last_dt, "semana"].iloc[0]
+        )
+
+    native_global = dict(
+        sorted(
+            {
+                feat: float(np.mean([native_por_enf[enf][feat] for enf in ENFERMEDADES]))
+                for feat in FEATURES
+            }.items(),
+            key=lambda x: -x[1],
+        )
+    )
+
+    th_m_all = thresholds(raw)
+    ultima_semana_global = str(pd.Timestamp(raw["fecha_inicio_semana"].max()).date())
+
+    artifact = {
+        "arquitectura": "rf-municipal-v2",
+        "modelos": models_final,
+        "thresholds_municipio": th_m_all,
+        "features": FEATURES,
+        "mun_cod_map": mun_cod_map,
+        "labels": LABELS,
+        "edades": EDADES,
+        "hiperparametros": best_params,
+        "ultima_semana_por_enfermedad": ultima_fecha_enf,
+        "ultima_semana_iso_por_enfermedad": ultima_iso_enf,
+        "ultima_semana": ultima_semana_global,
+    }
+    joblib.dump(artifact, os.path.join(ART, "modelo_rf.pkl"))
+
     with open(os.path.join(ART, "feature_names.json"), "w", encoding="utf-8") as f:
-        json.dump({"region": REG_FEATURES}, f, indent=2)
+        json.dump({"municipal": FEATURES}, f, indent=2)
+
     metricas = {
         "fecha_entrenamiento": datetime.now().isoformat(timespec="seconds"),
-        "split": {"corte_test": str(cut.date()), "filas_region_train": len(rtr), "filas_region_test": len(rte),
-                  "filas_muni_test": len(mte)},
-        "seleccion": {"hiperparametros_region": pr, "grid_region": grid_r},
+        "arquitectura": "rf-municipal-v2",
+        "split": {
+            "por_enfermedad": split_info,
+            "filas_muni_train": int(sum(v["filas_train"] for v in split_info.values())),
+            "filas_muni_test": int(len(eval_df)),
+        },
+        "seleccion": {
+            "hiperparametros": best_params,
+            "grid": grid_summary,
+        },
         "test": ev,
-        "shap_importancia_global": dict(sorted(zip(REG_FEATURES, map(float, shap_global)), key=lambda x: -x[1])),
-        "importancia_nativa": dict(sorted(zip(REG_FEATURES, map(float, final.feature_importances_)), key=lambda x: -x[1])),
+        "shap_importancia_global": shap_global,
+        "shap_por_enfermedad": shap_por_enf,
+        "importancia_nativa": native_global,
     }
     with open(os.path.join(ART, "metricas.json"), "w", encoding="utf-8") as f:
         json.dump(metricas, f, indent=2, ensure_ascii=False, default=str)
 
-    print("\n== REGIONAL (semana t+1) ==")
-    for k, d in ev["regional"].items():
-        s = d["sarima"]
-        print(f"{k:10s} n={d['n']:4d} medios={d['casos_medios']:7.2f} | MAE RF {d['rf']['mae']:6.2f} persist {d['persistencia']['mae']:6.2f} "
-              f"SARIMA {s['mae']:6.2f} | F1 RF {d['rf']['f1_macro']:.2f} persist {d['persistencia']['f1_macro']:.2f} SARIMA {s['f1_macro']:.2f}")
-    print("== MUNICIPAL (reparto) ==")
+    print("\n== EVALUACIÓN MUNICIPAL DIRECTA (semana t+1) ==")
     for k, d in ev["municipal"].items():
-        print(f"{k:10s} n={d['n']:5d} medios={d['casos_medios']:5.2f} | MAE reparto {d['reparto']['mae']:.3f} persist {d['persistencia']['mae']:.3f} "
-              f"| F1 reparto {d['reparto']['f1_macro']:.2f} persist {d['persistencia']['f1_macro']:.2f}")
+        r = d["rf"]
+        p = d["persistencia"]
+        s = d["sarima"]
+        print(
+            f"{k:10s} n={d['n']:4d} medios={d['casos_medios']:6.2f} | "
+            f"MAE RF {r['mae']:.3f} persist {p['mae']:.3f} SARIMA {s['mae']:.3f} | "
+            f"Acc RF {r['exactitud']*100:5.1f}% persist {p['exactitud']*100:5.1f}% | "
+            f"F1 RF {r['f1_macro']:.3f} persist {p['f1_macro']:.3f} SARIMA {s['f1_macro']:.3f}"
+        )
 
 
 if __name__ == "__main__":

@@ -31,3 +31,22 @@ class AlertCreateResponse(BaseModel):
     mensaje: str
     alerta: AlertResponse
 
+
+class PredictiveAlertDraftReviewRequest(BaseModel):
+    decision: str
+
+
+class PredictiveAlertDraftResponse(BaseModel):
+    id: int
+    municipio: str
+    semana: str
+    enfermedad: str
+    nivel: str
+    casos_esperados: float
+    mensaje: str
+    estado: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
