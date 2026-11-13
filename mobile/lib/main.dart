@@ -90,10 +90,40 @@ class _ProeviraAppState extends State<ProeviraApp> {
             backgroundColor: Colors.white,
             foregroundColor: Color(0xff1f2937),
             elevation: 0,
+            centerTitle: false,
+          ),
+          cardTheme: CardThemeData(
+            color: Colors.white,
+            elevation: 1,
+            margin: const EdgeInsets.symmetric(vertical: 6),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: Color(0xffe5e7eb)),
+            ),
+          ),
+          navigationBarTheme: const NavigationBarThemeData(
+            backgroundColor: Colors.white,
+            indicatorColor: Color(0xffffeadb),
+            labelTextStyle: WidgetStatePropertyAll(
+              TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
           inputDecorationTheme: const InputDecorationTheme(
             filled: true,
             fillColor: Color(0xfff3f4f6),
+            errorStyle: TextStyle(
+              color: Color(0xffb42318),
+              fontSize: 12,
+              decoration: TextDecoration.none,
+            ),
             border: OutlineInputBorder(
               borderSide: BorderSide(color: Color(0xffd1d5db)),
             ),
@@ -109,6 +139,7 @@ class _ProeviraAppState extends State<ProeviraApp> {
                     database: database,
                     socket: socket,
                     onLogout: _logout,
+                    municipioId: session?.municipioId,
                   ),
       );
 }

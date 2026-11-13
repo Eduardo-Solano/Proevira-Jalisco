@@ -98,11 +98,30 @@ class _SeguimientoSintomasState extends State<SeguimientoSintomas> {
         padding: const EdgeInsets.all(16),
         children: [
           Card(
-            color: Theme.of(context).colorScheme.errorContainer,
+            color: const Color(0xfffff1ef),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: Color(0xfff3b4ad)),
+            ),
             child: const Padding(
               padding: EdgeInsets.all(12),
-              child: Text(
-                'Esta aplicación no sustituye diagnóstico médico. Si tienes síntomas graves, busca atención profesional.',
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: Color(0xffb42318), size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Esta aplicación no sustituye diagnóstico médico. Si tienes síntomas graves, busca atención profesional.',
+                      style: TextStyle(
+                        color: Color(0xffb42318),
+                        fontSize: 12,
+                        height: 1.35,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -171,6 +190,7 @@ class _SeguimientoSintomasState extends State<SeguimientoSintomas> {
           TextField(
             controller: temperature,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            spellCheckConfiguration: const SpellCheckConfiguration.disabled(),
             decoration: const InputDecoration(
                 labelText: 'Temperatura (°C)', border: OutlineInputBorder()),
           ),
@@ -178,6 +198,7 @@ class _SeguimientoSintomasState extends State<SeguimientoSintomas> {
           TextField(
             controller: otrosSintomas,
             maxLines: 3,
+            spellCheckConfiguration: const SpellCheckConfiguration.disabled(),
             decoration: const InputDecoration(
               labelText: 'Otros síntomas (opcional)',
               border: OutlineInputBorder(),

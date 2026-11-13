@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../config.dart';
 import '../models/alerta.dart';
 import '../models/clue.dart';
+import '../models/incidencia.dart';
 import '../models/prediccion.dart';
 
 class ApiException implements Exception {
@@ -67,6 +68,25 @@ class ApiClient {
 
   Future<Clue> getClueDetail(String clues) async =>
       Clue.fromJson(_asMap(await _request('GET', '/clues/$clues')));
+
+  Future<List<Incidencia>> getMobileIncidence({
+    String enfermedad = 'dengue',
+    int semanas = 8,
+  }) async {
+    final response = _asMap(await _request(
+      'GET',
+      '/dashboard/mobile-incidence',
+      query: {'enfermedad': enfermedad, 'semanas': '$semanas'},
+    ));
+    final points = response['puntos'];
+    if (points is! List) {
+      throw const ApiException('Formato de incidencia inesperado.', null);
+    }
+    return points
+        .whereType<Map>()
+        .map((item) => Incidencia.fromJson(Map<String, dynamic>.from(item)))
+        .toList();
+  }
 
   Future<Map<String, dynamic>> postSymptoms(
     Map<String, dynamic> symptoms,
