@@ -7,6 +7,7 @@ import 'local_db/database_helper.dart';
 import 'local_db/sync_service.dart';
 import 'screens/home_paciente.dart';
 import 'screens/login_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() => runApp(const ProeviraApp());
 
@@ -25,6 +26,7 @@ class _ProeviraAppState extends State<ProeviraApp> {
   late final AlertsSocket socket;
   AuthSession? session;
   bool loading = true;
+  ThemeMode themeMode = ThemeMode.light;
 
   @override
   void initState() {
@@ -32,7 +34,15 @@ class _ProeviraAppState extends State<ProeviraApp> {
     auth = AuthService(api);
     sync = SyncService(api, database);
     socket = AlertsSocket();
+    _restoreTheme();
     _restore();
+  }
+
+  Future<void> _restoreTheme() async {
+    final preferences = await SharedPreferences.getInstance();
+    if (mounted && preferences.getBool('dark_mode') == true) {
+      setState(() => themeMode = ThemeMode.dark);
+    }
   }
 
   Future<void> _restore() async {
@@ -63,6 +73,16 @@ class _ProeviraAppState extends State<ProeviraApp> {
     if (mounted) setState(() => session = null);
   }
 
+  Future<void> _setDarkMode(bool enabled) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('dark_mode', enabled);
+    if (mounted) setState(() => themeMode = enabled ? ThemeMode.dark : ThemeMode.light);
+  }
+
+  void _setMunicipio(String? municipioId) {
+    if (mounted) setState(() => session = auth.session);
+  }
+
   @override
   void dispose() {
     socket.dispose();
@@ -75,6 +95,7 @@ class _ProeviraAppState extends State<ProeviraApp> {
   Widget build(BuildContext context) => MaterialApp(
         title: 'Proevira Jalisco',
         debugShowCheckedModeBanner: false,
+        themeMode: themeMode,
         theme: ThemeData(
           colorScheme: const ColorScheme.light(
             primary: Color(0xffed7d22),
@@ -130,6 +151,14 @@ class _ProeviraAppState extends State<ProeviraApp> {
           ),
           useMaterial3: true,
         ),
+        darkTheme: ThemeData(
+          brightness: Brightness.dark,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xffed7d22),
+            brightness: Brightness.dark,
+          ),
+          useMaterial3: true,
+        ),
         home: loading
             ? const Scaffold(body: Center(child: CircularProgressIndicator()))
             : session == null
@@ -140,6 +169,11 @@ class _ProeviraAppState extends State<ProeviraApp> {
                     socket: socket,
                     onLogout: _logout,
                     municipioId: session?.municipioId,
+                    auth: auth,
+                    onMunicipioChanged: _setMunicipio,
+                    darkMode: themeMode == ThemeMode.dark,
+                    onDarkModeChanged: _setDarkMode,
+                    sync: sync,
                   ),
       );
 }

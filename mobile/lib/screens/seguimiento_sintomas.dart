@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../api/api_client.dart';
 import '../local_db/database_helper.dart';
 import '../services/reminder_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SeguimientoSintomas extends StatefulWidget {
   const SeguimientoSintomas(
@@ -32,6 +33,46 @@ class _SeguimientoSintomasState extends State<SeguimientoSintomas> {
   final otrosSintomas = TextEditingController();
   bool loading = false;
   bool remindersEnabled = false;
+  TimeOfDay reminderTime = const TimeOfDay(hour: 19, minute: 0);
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreReminderSettings();
+  }
+
+  Future<void> _restoreReminderSettings() async {
+    final preferences = await SharedPreferences.getInstance();
+    final hour = preferences.getInt('reminder_hour');
+    final minute = preferences.getInt('reminder_minute');
+    if (mounted) {
+      setState(() {
+        remindersEnabled = preferences.getBool('reminders_enabled') ?? false;
+        if (hour != null && minute != null) {
+          reminderTime = TimeOfDay(hour: hour, minute: minute);
+        }
+      });
+    }
+  }
+
+  Future<void> configureReminder() async {
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: reminderTime,
+    );
+    if (selected == null) return;
+    await ReminderService.instance.scheduleDailyAt(selected);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('reminders_enabled', true);
+    await preferences.setInt('reminder_hour', selected.hour);
+    await preferences.setInt('reminder_minute', selected.minute);
+    if (mounted) {
+      setState(() {
+        reminderTime = selected;
+        remindersEnabled = true;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -133,14 +174,27 @@ class _SeguimientoSintomasState extends State<SeguimientoSintomas> {
               value: remindersEnabled,
               onChanged: (value) async {
                 if (value) {
-                  await ReminderService.instance.scheduleDaily();
+                  await configureReminder();
                 } else {
                   await ReminderService.instance.cancel();
+                  final preferences =
+                      await SharedPreferences.getInstance();
+                  await preferences.setBool('reminders_enabled', false);
+                  if (mounted) setState(() => remindersEnabled = false);
                 }
-                if (mounted) setState(() => remindersEnabled = value);
               },
             ),
           ),
+          if (remindersEnabled)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.schedule),
+                title: const Text('Hora del recordatorio'),
+                subtitle: Text(reminderTime.format(context)),
+                trailing: const Icon(Icons.edit_outlined),
+                onTap: configureReminder,
+              ),
+            ),
           SwitchListTile(
               title: const Text('Fiebre'),
               value: fiebre,

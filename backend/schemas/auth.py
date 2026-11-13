@@ -7,6 +7,10 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class PatientProfileUpdate(BaseModel):
+    municipio_id: Optional[str] = None
+
+
 class LoginResponse(BaseModel):
     token: str
     role: str

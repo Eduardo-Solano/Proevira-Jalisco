@@ -47,6 +47,13 @@ class ApiClient {
   Future<Map<String, dynamic>> me() async =>
       _asMap(await _request('GET', '/auth/me'));
 
+  Future<Map<String, dynamic>> updatePatientProfile(String? municipioId) async =>
+      _asMap(await _request(
+        'PATCH',
+        '/auth/me',
+        body: {'municipio_id': municipioId},
+      ));
+
   Future<List<Alerta>> getAlerts({String? municipio}) async {
     final query = <String, String>{'activa': 'true'};
     if (municipio != null && municipio.isNotEmpty) {

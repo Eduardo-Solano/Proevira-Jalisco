@@ -10,7 +10,8 @@ from backend.schemas.auth import (
     UserProfileResponse,
     RegisterMedicoRequest,
     RegisterMedicoResponse,
-    VerifyMedicoResponse
+    VerifyMedicoResponse,
+    PatientProfileUpdate,
 )
 from backend.core.security import (
     verify_password,
@@ -78,7 +79,35 @@ def get_me(
             cedula=None,
             verificado=current_user.get("verificado", True)
         )
+    return UserProfileResponse(
+        uid=user.uid,
+        email=user.email,
+        role=user.role,
+        municipio_id=user.municipio_id,
+        institucion=user.institucion,
+        cedula=user.cedula,
+        verificado=user.verificado
+    )
 
+
+@router.patch("/me", response_model=UserProfileResponse)
+def update_patient_profile(
+    request: PatientProfileUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    uid = current_user.get("uid") or current_user.get("sub")
+    user = db.query(Usuario).filter(Usuario.uid == uid).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Perfil no encontrado")
+    if user.role != "paciente":
+        raise HTTPException(
+            status_code=403,
+            detail="Solo los pacientes pueden actualizar este perfil",
+        )
+    user.municipio_id = request.municipio_id
+    db.commit()
+    db.refresh(user)
     return UserProfileResponse(
         uid=user.uid,
         email=user.email,

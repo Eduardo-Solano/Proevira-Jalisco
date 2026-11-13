@@ -85,4 +85,26 @@ class AuthService {
     await preferences.remove('auth_email');
     await preferences.remove('auth_municipio');
   }
+
+  Future<AuthSession> updateMunicipio(String? municipioId) async {
+    final data = await api.updatePatientProfile(municipioId);
+    final current = session;
+    if (current == null) {
+      throw const ApiException('La sesión no está disponible.', null);
+    }
+    session = AuthSession(
+      token: current.token,
+      role: current.role,
+      uid: current.uid,
+      municipioId: data['municipio_id']?.toString(),
+      email: current.email,
+    );
+    final preferences = await SharedPreferences.getInstance();
+    if (municipioId == null) {
+      await preferences.remove('auth_municipio');
+    } else {
+      await preferences.setString('auth_municipio', municipioId);
+    }
+    return session!;
+  }
 }

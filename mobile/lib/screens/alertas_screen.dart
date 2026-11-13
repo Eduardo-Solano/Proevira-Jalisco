@@ -10,6 +10,7 @@ import '../api/ws_client.dart';
 import '../local_db/database_helper.dart';
 import '../models/alerta.dart';
 import '../models/incidencia.dart';
+import '../services/reminder_service.dart';
 
 class AlertasScreen extends StatefulWidget {
   const AlertasScreen({
@@ -56,6 +57,10 @@ class _AlertasScreenState extends State<AlertasScreen> {
       final alert = Alerta.fromJson(json);
       if (mounted && belongsToPatient(alert)) {
         setState(() => alerts = [alert, ...alerts]);
+        ReminderService.instance.showAlertNotification(
+          title: 'Nueva alerta epidemiológica',
+          body: '${alert.municipio}: ${alert.mensaje}',
+        );
       }
     });
     load();
@@ -183,6 +188,27 @@ class _AlertasScreenState extends State<AlertasScreen> {
     return Colors.amber.shade700;
   }
 
+  Future<void> showIncidenceDetail(Incidencia point) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(point.nombre),
+        content: Text(
+          '${point.casos} casos acumulados en el periodo seleccionado.\n'
+          'Promedio semanal: ${point.promedioSemanal.toStringAsFixed(1)}\n'
+          'Última semana registrada: ${point.ultimaSemana}\n\n'
+          'Estos datos son agregados y no representan un diagnóstico individual.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget incidenceMap(BuildContext context) {
     final maxCases = incidence.fold<int>(
       0,
@@ -259,9 +285,23 @@ class _AlertasScreenState extends State<AlertasScreen> {
               ],
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Text('Casos acumulados en el periodo seleccionado'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Casos acumulados en el periodo seleccionado',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                if (incidence.isNotEmpty)
+                  Text(
+                    'Última actualización: ${incidence.first.ultimaSemana} · '
+                    'Fuente: vigilancia epidemiológica',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+              ],
+            ),
           ),
           const SizedBox(height: 8),
           SizedBox(
@@ -302,7 +342,9 @@ class _AlertasScreenState extends State<AlertasScreen> {
                                     point: LatLng(point.lat, point.lon),
                                     width: 44,
                                     height: 44,
-                                    child: Tooltip(
+                                    child: GestureDetector(
+                                      onTap: () => showIncidenceDetail(point),
+                                      child: Tooltip(
                                       message:
                                           '${point.nombre}\n${point.casos} casos',
                                       child: Container(
@@ -321,6 +363,7 @@ class _AlertasScreenState extends State<AlertasScreen> {
                                               color: Colors.white,
                                               fontWeight: FontWeight.bold,
                                               fontSize: 11),
+                                        ),
                                         ),
                                       ),
                                     ),
