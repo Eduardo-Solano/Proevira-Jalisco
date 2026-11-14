@@ -39,9 +39,9 @@ class InferenceEngine:
         self.raw_data: Optional[pd.DataFrame] = None
         self.municipios_info: Dict[str, Dict[str, Any]] = {}
 
-    def load(self):
+    def load(self, force: bool = False):
         """Carga modelos municipales entrenados, CSV histórico unificado y GeoJSON."""
-        if self.loaded:
+        if self.loaded and not force:
             return
 
         model_path = os.path.join(settings.MODEL_ARTIFACTS_DIR, "modelo_rf.pkl")
@@ -89,6 +89,11 @@ class InferenceEngine:
                     }
 
         self.loaded = True
+
+    def reload(self):
+        """Recarga modelos y series históricas desde disco tras actualizar datasets."""
+        self.explainers.clear()
+        self.load(force=True)
 
     def _normalize_enfermedad(self, enfermedad: str) -> str:
         enf = (enfermedad or "dengue").strip().lower()

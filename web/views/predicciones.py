@@ -105,34 +105,37 @@ def render_predicciones_view():
     )
     with st.container(border=True):
         _titulo("Elige qué consultar")
-        with st.form("predicciones_filtros"):
-            f1, f2, f3 = st.columns(3)
-            with f1:
-                if cobertura == "Municipio":
-                    mun = st.selectbox(
-                        "Municipio",
-                        list(MUNICIPIOS_JALISCO.keys()),
-                        format_func=lambda k: MUNICIPIOS_JALISCO[k]["nombre"],
-                        key="pred_mun",
-                    )
-                else:
-                    mun = None
-                    st.text_input("Municipios incluidos", "Los 12 municipios de la Región Centro", disabled=True)
-            with f2:
-                enf = st.selectbox(
-                    "Enfermedad",
-                    list(ENFERMEDADES.keys()),
-                    format_func=lambda x: ENFERMEDADES[x],
-                    key="pred_enf",
+        f1, f2, f3, f4 = st.columns([1.2, 1, 1, 0.9])
+        with f1:
+            if cobertura == "Municipio":
+                mun = st.selectbox(
+                    "Municipio",
+                    list(MUNICIPIOS_JALISCO.keys()),
+                    format_func=lambda k: MUNICIPIOS_JALISCO[k]["nombre"],
+                    key="pred_mun",
                 )
-            with f3:
-                horizonte = st.selectbox(
-                    "Semanas a predecir",
-                    [1, 2, 3, 4],
-                    format_func=lambda n: f"{n} semana{'s' if n != 1 else ''}",
-                    key="pred_horizon",
-                )
-            st.form_submit_button("Actualizar proyección")
+            else:
+                mun = None
+                st.text_input("Municipios incluidos", "Los 12 municipios de la Región Centro", disabled=True)
+        with f2:
+            enf = st.selectbox(
+                "Enfermedad",
+                list(ENFERMEDADES.keys()),
+                format_func=lambda x: ENFERMEDADES[x],
+                key="pred_enf",
+            )
+        with f3:
+            horizonte = st.selectbox(
+                "Semanas a predecir",
+                [1, 2, 3, 4],
+                format_func=lambda n: f"{n} semana{'s' if n != 1 else ''}",
+                key="pred_horizon",
+            )
+        with f4:
+            st.markdown("<div style='height:1.75rem'></div>", unsafe_allow_html=True)
+            if st.button("Actualizar datos", use_container_width=True, key="pred_refresh_btn"):
+                api._clear_read_cache()
+                st.rerun()
 
     es_region = cobertura == "Región Centro"
     nombre_municipio = "Región Centro" if es_region else MUNICIPIOS_JALISCO[mun]["nombre"]
@@ -158,11 +161,15 @@ def render_predicciones_view():
 
     # ── Resumen del pronóstico ──
     with st.container(border=True):
-        _titulo("Estimación para la primera semana")
+        titulo_resumen = (
+            "Resumen de la próxima semana"
+            if horizonte == 1
+            else f"Resumen del pronóstico ({horizonte} semanas)"
+        )
+        _titulo(titulo_resumen)
         st.caption(
             f"{nombre_municipio} · {nombre_enfermedad} · "
-            f"Pronóstico de {horizonte} semana{'s' if horizonte != 1 else ''}; "
-            "las tarjetas muestran la primera."
+            f"Horizonte seleccionado: {horizonte} semana{'s' if horizonte != 1 else ''}."
         )
 
         if df_p.empty:
@@ -173,32 +180,55 @@ def render_predicciones_view():
         else:
             forecast = df_p.iloc[0]
             casos_proyectados = float(forecast["casos"])
+            casos_enteros = int(round(casos_proyectados))
+            casos_por_semana = [int(round(float(v))) for v in df_p["casos"].tolist()]
+            total_periodo = int(sum(casos_por_semana))
+            sufijo_prox = "caso" if casos_enteros == 1 else "casos"
 
-            cols = st.columns(3)
-            cols[0].metric(
-                "Casos estimados en la región" if es_region else "Casos estimados",
-                f"{casos_proyectados:,.1f}",
-                help=(
-                    "Suma de las proyecciones municipales para la primera semana."
-                    if es_region
-                    else "Estimación del modelo para la primera semana del horizonte."
-                ),
-            )
-            cols[1].metric("Fecha estimada", _fecha_texto(forecast.get("semana")))
+            cols = st.columns([1.15, 1.05, 1])
+            if horizonte == 1:
+                cols[0].metric(
+                    "Casos en la región (1 semana)" if es_region else "Casos esperados (1 semana)",
+                    f"{casos_enteros:,}",
+                    help=(
+                        "Suma entera de las proyecciones municipales para la próxima semana."
+                        if es_region
+                        else f"Casos enteros esperados para esa semana (promedio estadístico: {casos_proyectados:.2f})."
+                    ),
+                )
+                cols[1].metric("Inicio de la semana", _fecha_texto(forecast.get("semana")))
+            else:
+                desglose_sem = ", ".join(str(v) for v in casos_por_semana)
+                cols[0].metric(
+                    f"Acumulado ({horizonte} semanas)",
+                    f"{total_periodo:,}",
+                    delta=f"Por semana: {desglose_sem}",
+                    delta_color="off",
+                    help=(
+                        "Suma de los casos estimados de cada semana individual dentro del periodo seleccionado. "
+                        f"Primera semana: {casos_enteros} {sufijo_prox}; última semana: {casos_por_semana[-1]}."
+                    ),
+                )
+                cols[1].metric(
+                    "Desde el",
+                    _fecha_texto(df_p.iloc[0].get("semana")),
+                    delta=f"Hasta el {_fecha_texto(df_p.iloc[-1].get('semana'))}",
+                    delta_color="off",
+                )
             if es_region:
                 cols[2].metric("Municipios incluidos", str(municipios_incluidos))
             else:
                 cols[2].metric(
-                    "Rango estimado",
+                    "Nivel de riesgo esperado",
                     _riesgo_texto(forecast.get("nivel")),
-                    help="Rango calculado con umbrales históricos de este municipio; no es una alerta oficial.",
+                    help="Calculado frente al historial habitual de este municipio; no sustituye un aviso oficial.",
                 )
 
             if not es_region:
                 nivel = str(forecast.get("nivel", "")).lower()
                 interpretacion = DESCRIPCION_RIESGO.get(nivel)
                 if interpretacion:
-                    st.caption(f"{interpretacion} No es una alerta oficial.")
+                    st.caption(f"{interpretacion} Uso orientativo para vigilancia clínica.")
 
     # ── Curva epidemiológica ──
     with st.container(border=True):
@@ -215,6 +245,8 @@ def render_predicciones_view():
         elif df_p.empty:
             st.info("No hay una proyección disponible para esta selección.")
         else:
+            df_p = df_p.copy()
+            df_p["casos"] = df_p["casos"].astype(float).round().astype(int)
             fig = go.Figure()
             nombre_observado = "Total regional observado" if es_region else "Casos observados"
             nombre_estimado = "Proyección regional" if es_region else "Casos estimados"
@@ -260,10 +292,11 @@ def render_predicciones_view():
                     marker=dict(size=8, symbol="diamond", color="#d32f2f"),
                 ))
             fig.update_layout(
-                xaxis_title="Fecha de inicio de semana", yaxis_title="Casos",
+                xaxis_title="Inicio de semana", yaxis_title="Casos",
                 template="plotly_white", hovermode="x unified", height=390,
                 legend=dict(orientation="h", y=1.02, xanchor="right", x=1),
                 margin=dict(l=10, r=10, t=20, b=10),
+                yaxis=dict(rangemode="tozero", tickformat="d"),
             )
             fig.update_xaxes(tickformat="%d/%m/%Y", tickangle=-35)
             st.plotly_chart(fig, use_container_width=True)
@@ -288,27 +321,26 @@ def render_predicciones_view():
                 }
             )
             detalle["Inicio de semana"] = detalle["Inicio de semana"].map(_fecha_texto)
-            detalle["Casos estimados"] = detalle["Casos estimados"].astype(float).round(1)
+            detalle["Casos estimados"] = detalle["Casos estimados"].astype(float).round(0).astype(int)
             if "Rango estimado" in detalle:
                 detalle["Rango estimado"] = detalle["Rango estimado"].astype(str).str.capitalize()
             st.markdown("**Estimación por semana**")
             st.dataframe(detalle, hide_index=True, use_container_width=True)
 
-    # ── Variables del modelo ──
+    # ── Factores explicativos claros ──
     if not es_region:
         with st.container(border=True):
-            _titulo("Variables más importantes del modelo")
+            _titulo("Factores que más influyen en esta estimación")
             st.caption(
-                "Resumen global del modelo: muestra qué variables aportan más, no qué causó "
-                "la proyección de este municipio ni si una variable aumenta o reduce los casos."
+                "Indica qué señales clínicas e históricas tuvieron mayor peso para calcular la proyección."
             )
 
             df_shap = pd.DataFrame(shap_data.get("feature_importance", []))
 
             if df_p.empty:
-                st.info("Se mostrarán variables cuando haya una proyección disponible.")
+                st.info("Se mostrarán factores cuando haya una proyección disponible.")
             elif df_shap.empty:
-                st.info("No hay información de importancia de variables para mostrar.")
+                st.info("No hay factores explicativos disponibles para mostrar.")
             else:
                 df_shap["importancia"] = pd.to_numeric(df_shap["shap"], errors="coerce").abs()
                 df_shap = df_shap.dropna(subset=["importancia"])
@@ -316,38 +348,38 @@ def render_predicciones_view():
                 df_shap = df_shap.groupby("Variable", as_index=False)["importancia"].sum()
                 total_importancia = df_shap["importancia"].sum()
                 if total_importancia <= 0:
-                    st.info("No hay información de importancia de variables para mostrar.")
+                    st.info("No hay factores explicativos disponibles para mostrar.")
                 else:
-                    df_shap["Importancia relativa"] = df_shap["importancia"] / total_importancia * 100
-                    df_shap = df_shap.nlargest(8, "Importancia relativa").sort_values("Importancia relativa")
+                    df_shap["Peso relativo"] = df_shap["importancia"] / total_importancia * 100
+                    df_shap = df_shap.nlargest(6, "Peso relativo").sort_values("Peso relativo")
                     fig_s = px.bar(
                         df_shap,
-                        x="Importancia relativa",
+                        x="Peso relativo",
                         y="Variable",
                         orientation="h",
-                        labels={"Importancia relativa": "Importancia relativa (%)", "Variable": ""},
-                        text="Importancia relativa",
+                        labels={"Peso relativo": "Influencia relativa (%)", "Variable": ""},
+                        text="Peso relativo",
                         color_discrete_sequence=["#4e9577"],
                     )
-                    fig_s.update_traces(texttemplate="%{text:.1f}%", textposition="outside", cliponaxis=False)
+                    fig_s.update_traces(texttemplate="%{text:.0f}%", textposition="outside", cliponaxis=False)
                     fig_s.update_layout(
                         template="plotly_white",
-                        height=max(300, len(df_shap) * 42),
+                        height=max(260, len(df_shap) * 42),
                         margin=dict(l=10, r=50, t=10, b=10),
                         showlegend=False,
-                        xaxis=dict(range=[0, float(df_shap["Importancia relativa"].max()) * 1.25]),
+                        xaxis=dict(range=[0, float(df_shap["Peso relativo"].max()) * 1.25]),
                     )
                     st.plotly_chart(fig_s, use_container_width=True)
 
-    # ── Detalles técnicos opcionales ──
-    with st.expander("Métricas y detalles técnicos"):
+    # ── Referencia clínica y confiabilidad ──
+    with st.expander("Confiabilidad histórica y fechas de actualización"):
+        disease_key = "covid" if enf in ("covid-19", "covid") else enf
+        info_enf = model_info.get("por_enfermedad", {}).get(disease_key, {}) if isinstance(model_info, dict) else {}
+        ultima_obs_enf = info_enf.get("ultima_semana_datos") or model_info.get("ultima_semana_datos")
+
         if es_region:
-            st.caption(
-                "Las métricas disponibles corresponden a modelos municipales y no describen "
-                "el desempeño de esta suma regional."
-            )
+            st.caption("Vista agregada de los 12 municipios de la Región Centro.")
         else:
-            disease_key = "covid" if enf in ("covid-19", "covid") else enf
             disease_block = (
                 metricas_modelo.get("test", {}).get("municipal", {}).get(disease_key, {})
                 if metricas_modelo
@@ -356,40 +388,28 @@ def render_predicciones_view():
             test_metrics = disease_block.get("rf", disease_block.get("reparto", {}))
             muestras_evaluacion = disease_block.get("n")
             st.caption(
-                "Evaluación general del modelo en semanas históricas separadas para prueba; "
-                "no mide la precisión de esta proyección en particular."
+                f"Desempeño comprobado en semanas históricas de {nombre_enfermedad} en la Región Centro."
             )
-            metric_cols = st.columns(4)
+            metric_cols = st.columns(3)
             metric_cols[0].metric(
-                "Error promedio (MAE)",
-                f"{test_metrics['mae']:.3f}" if "mae" in test_metrics else "No disponible",
-                help="Diferencia absoluta promedio entre la estimación y los casos observados. Menor es mejor.",
+                "Acierto en nivel de riesgo",
+                f"{test_metrics['exactitud']*100:.0f}%" if "exactitud" in test_metrics else "No disponible",
+                help="Porcentaje de semanas históricas donde la clasificación de riesgo coincidió con lo observado.",
             )
             metric_cols[1].metric(
-                "Error con penalización (RMSE)",
-                f"{test_metrics['rmse']:.3f}" if "rmse" in test_metrics else "No disponible",
-                help="Penaliza más los errores grandes. Menor es mejor.",
+                "Variación habitual por semana",
+                f"±{test_metrics['mae']:.1f} casos" if "mae" in test_metrics else "No disponible",
+                help="Diferencia promedio semanal entre lo proyectado y los casos confirmados.",
             )
             metric_cols[2].metric(
-                "Clasificación de riesgo (F1)",
-                f"{test_metrics['f1_macro']:.3f}" if "f1_macro" in test_metrics else "No disponible",
-                help="Resume el equilibrio del modelo al clasificar niveles de riesgo. Más cercano a 1 es mejor.",
-            )
-            metric_cols[3].metric(
-                "Registros evaluados",
+                "Semanas evaluadas",
                 f"{muestras_evaluacion:,}" if muestras_evaluacion is not None else "No disponible",
             )
 
-            split = metricas_modelo.get("split", {}) if metricas_modelo else {}
-            corte = split.get("por_enfermedad", {}).get(disease_key, {}).get("corte_test") or split.get("corte_test", "No disponible")
-            st.caption(f"Enfermedad: {nombre_enfermedad} · Corte de prueba: {corte}.")
-        st.markdown("**Datos del modelo**")
-        modelo_col, data_col, training_col, forecast_col = st.columns(4)
-        modelo_col.metric("Modelo", model_info.get("modelo", "Random Forest"))
-        data_col.metric("Última fecha observada", _fecha_texto(model_info.get("ultima_semana_datos")))
-        training_col.metric("Entrenamiento", model_info.get("fecha_entrenamiento") or "No disponible")
+        data_col, forecast_col = st.columns(2)
+        data_col.metric("Última semana clínica registrada", _fecha_texto(ultima_obs_enf))
         forecast_col.metric(
-            "Última fecha del horizonte",
+            "Última semana del horizonte",
             _fecha_texto(predicciones[-1]["semana"]) if predicciones else "No disponible",
         )
 

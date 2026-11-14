@@ -1,7 +1,4 @@
-# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Local SQLite database
 proevira.db

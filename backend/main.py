@@ -10,7 +10,8 @@ from backend.api import (
     alerts,
     clues,
     symptoms,
-    dashboard
+    dashboard,
+    datasets,
 )
 
 # Configuración de Logging
@@ -53,6 +54,7 @@ app.include_router(alerts.router, prefix=settings.API_V1_PREFIX)
 app.include_router(clues.router, prefix=settings.API_V1_PREFIX)
 app.include_router(symptoms.router, prefix=settings.API_V1_PREFIX)
 app.include_router(dashboard.router, prefix=settings.API_V1_PREFIX)
+app.include_router(datasets.router, prefix=settings.API_V1_PREFIX)
 
 # Registro de rutas de compatibilidad directa (según contrato /auth/*, /predictions/*, etc.)
 app.include_router(auth.router, prefix="")
@@ -61,6 +63,7 @@ app.include_router(alerts.router, prefix="")
 app.include_router(clues.router, prefix="")
 app.include_router(symptoms.router, prefix="")
 app.include_router(dashboard.router, prefix="")
+app.include_router(datasets.router, prefix="")
 
 
 @app.on_event("startup")
@@ -77,6 +80,7 @@ async def on_startup():
                 connection.execute(
                     text("ALTER TABLE sintomas ADD COLUMN temperatura FLOAT")
                 )
-    from backend.db.models import AlertaPredictivaBorrador
+    from backend.db.models import AlertaPredictivaBorrador, ImportacionDataset
     AlertaPredictivaBorrador.__table__.create(bind=engine, checkfirst=True)
+    ImportacionDataset.__table__.create(bind=engine, checkfirst=True)
     logger.info(f"API Documentación disponible en /docs")

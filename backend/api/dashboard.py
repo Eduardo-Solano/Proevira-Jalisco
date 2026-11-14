@@ -1,15 +1,99 @@
 import os
 import json
+import pandas as pd
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from backend.db.database import get_db
 from backend.db.models import Prediccion, Alerta, Municipio
 from backend.core.inference import inference_engine
-from backend.core.security import require_roles
+from backend.core.security import get_current_user, require_roles
 from backend.config import settings
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+
+
+@router.get("/mobile-incidence")
+def get_mobile_incidence(
+    enfermedad: str = Query("dengue"),
+    semanas: int = Query(8, ge=4, le=12),
+    current_user: dict = Depends(get_current_user),
+):
+    """Incidencia histórica agregada para el mapa informativo de pacientes."""
+    inference_engine.load()
+    enfermedad = enfermedad.strip().lower()
+    if enfermedad not in {"dengue", "influenza", "covid"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Enfermedad debe ser dengue, influenza o covid",
+        )
+
+    raw = inference_engine.raw_data
+    if raw is None or raw.empty:
+        return {
+            "enfermedad": enfermedad,
+            "semanas": [],
+            "puntos": [],
+        }
+
+    series = raw[
+        raw["enfermedad"].astype(str).str.strip().str.lower() == enfermedad
+    ].copy()
+    if series.empty:
+        return {
+            "enfermedad": enfermedad,
+            "semanas": [],
+            "puntos": [],
+        }
+    series["fecha_inicio_semana"] = pd.to_datetime(
+        series["fecha_inicio_semana"], errors="coerce"
+    )
+    series = series.dropna(subset=["fecha_inicio_semana"])
+    if series.empty:
+        return {
+            "enfermedad": enfermedad,
+            "semanas": [],
+            "puntos": [],
+        }
+    latest = series["fecha_inicio_semana"].max()
+    selected_weeks = sorted(
+        series.loc[
+            series["fecha_inicio_semana"]
+            >= latest - pd.Timedelta(weeks=semanas - 1),
+            "fecha_inicio_semana",
+        ].unique()
+    )
+    series = series[series["fecha_inicio_semana"].isin(selected_weeks)]
+    grouped = (
+        series.groupby("municipio_id", as_index=False)
+        .agg(
+            casos=("casos", "sum"),
+            ultima_semana=("fecha_inicio_semana", "max"),
+        )
+    )
+
+    points = []
+    for row in grouped.to_dict("records"):
+        municipio_id = str(row["municipio_id"]).zfill(5)
+        info = inference_engine.municipios_info.get(municipio_id, {})
+        nombre = info.get("nombre") or row.get("municipio") or municipio_id
+        points.append(
+            {
+                "municipio": municipio_id,
+                "nombre": nombre,
+                "lat": info.get("lat"),
+                "lon": info.get("lon"),
+                "casos": int(row["casos"]),
+                "promedio_semanal": round(float(row["casos"]) / semanas, 1),
+                "ultima_semana": str(row["ultima_semana"].date()),
+            }
+        )
+
+    return {
+        "enfermedad": enfermedad,
+        "semanas": [str(item.date()) for item in selected_weeks],
+        "puntos": [point for point in points if point["lat"] and point["lon"]],
+    }
 
 
 @router.get("/summary")

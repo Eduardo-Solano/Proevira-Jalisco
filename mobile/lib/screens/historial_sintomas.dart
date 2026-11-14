@@ -4,16 +4,19 @@ import 'package:fl_chart/fl_chart.dart';
 import '../api/api_client.dart';
 import '../local_db/database_helper.dart';
 import '../models/registro_sintomas.dart';
+import '../local_db/sync_service.dart';
 
 class HistorialSintomas extends StatefulWidget {
   const HistorialSintomas({
     required this.api,
     required this.database,
+    required this.sync,
     super.key,
   });
 
   final ApiClient api;
   final DatabaseHelper database;
+  final SyncService sync;
 
   @override
   State<HistorialSintomas> createState() => _HistorialSintomasState();
@@ -72,6 +75,25 @@ class _HistorialSintomasState extends State<HistorialSintomas> {
             const SizedBox(height: 4),
             const Text(
               'Aquí puedes consultar los reportes que has enviado y los que esperan sincronización.',
+            ),
+            const SizedBox(height: 10),
+            Card(
+              color: Theme.of(context).colorScheme.secondaryContainer,
+              child: const Padding(
+                padding: EdgeInsets.all(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.medical_information_outlined),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Muestra este historial o información a tu médico para facilitar tu orientación.',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
             if (records.any((record) => record.temperatura != null)) ...[
               const SizedBox(height: 16),
@@ -176,6 +198,20 @@ class _HistorialSintomasState extends State<HistorialSintomas> {
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Text(record.recomendacion!),
+                      ),
+                    ],
+                    if (!record.sincronizado) ...[
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            await widget.sync.syncPending();
+                            await load();
+                          },
+                          icon: const Icon(Icons.sync),
+                          label: const Text('Reintentar sincronización'),
+                        ),
                       ),
                     ],
                   ],

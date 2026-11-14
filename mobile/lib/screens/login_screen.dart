@@ -53,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       const Icon(Icons.health_and_safety, size: 72),
                       const SizedBox(height: 12),
-                      Text('Proevira Jalisco',
+                      Text('VIRALES App',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.headlineMedium),
                       const SizedBox(height: 8),
@@ -64,6 +64,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextFormField(
                         controller: email,
                         keyboardType: TextInputType.emailAddress,
+                        spellCheckConfiguration:
+                            const SpellCheckConfiguration.disabled(),
                         decoration: const InputDecoration(
                           labelText: 'Correo electrónico',
                           prefixIcon: Icon(Icons.email_outlined),
@@ -78,6 +80,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextFormField(
                         controller: password,
                         obscureText: true,
+                        spellCheckConfiguration:
+                            const SpellCheckConfiguration.disabled(),
                         decoration: const InputDecoration(
                           labelText: 'Contraseña',
                           prefixIcon: Icon(Icons.lock_outline),
