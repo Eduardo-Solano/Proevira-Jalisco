@@ -33,7 +33,9 @@ def _salir_del_panel():
 
 _ROLES_ETIQUETAS = {
     "medico": "Personal médico",
+    "funcionario": "Administrador",
     "admin": "Administrador",
+    "administrador": "Administrador",
     "ciudadano": "Vigilancia ciudadana",
 }
 

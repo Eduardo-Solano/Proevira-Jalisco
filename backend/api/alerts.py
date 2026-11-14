@@ -18,6 +18,7 @@ from backend.core.inference import inference_engine
 
 router = APIRouter(tags=["Alertas"])
 NIVELES_ALERTA_PREDICTIVA = {"medio", "alto", "crítico"}
+ROLES_EMISION_ALERTAS = ["funcionario", "medico", "admin", "administrador"]
 
 
 def _utcnow_naive() -> datetime.datetime:
@@ -76,10 +77,10 @@ def get_alerts(
 async def create_alert(
     request: AlertCreateRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_roles(["funcionario"]))
+    current_user: dict = Depends(require_roles(ROLES_EMISION_ALERTAS))
 ):
     """
-    Crea una nueva alerta epidemiológica (Exclusivo funcionario)
+    Crea una nueva alerta epidemiológica (médico verificado o administrador/funcionario)
     y la emite inmediatamente en tiempo real vía WebSocket a todos los clientes.
     """
     m_id = request.municipio_id
@@ -128,7 +129,7 @@ async def create_alert(
 @router.post("/alerts/predictive-drafts/generate")
 def generate_predictive_alert_drafts(
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_roles(["funcionario"])),
+    current_user: dict = Depends(require_roles(ROLES_EMISION_ALERTAS)),
 ):
     """Genera borradores idempotentes para proyecciones municipales de riesgo medio o mayor."""
     inference_engine.load()
@@ -243,7 +244,7 @@ def get_predictive_alert_drafts(
     municipio: Optional[str] = Query(None, description="Filtrar por municipio"),
     estado: str = Query("pendiente"),
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_roles(["funcionario"])),
+    current_user: dict = Depends(require_roles(ROLES_EMISION_ALERTAS)),
 ):
     if estado not in {"pendiente", "aprobada", "descartada", "obsoleta"}:
         raise HTTPException(status_code=400, detail="Estado de borrador no válido")
@@ -271,7 +272,7 @@ async def review_predictive_alert_draft(
     draft_id: int,
     request: PredictiveAlertDraftReviewRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_roles(["funcionario"])),
+    current_user: dict = Depends(require_roles(ROLES_EMISION_ALERTAS)),
 ):
     if request.decision not in {"aprobar", "descartar"}:
         raise HTTPException(status_code=400, detail="La decisión debe ser 'aprobar' o 'descartar'")
@@ -324,7 +325,7 @@ def update_alert(
     alert_id: int,
     request: AlertPatchRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_roles(["funcionario"]))
+    current_user: dict = Depends(require_roles(ROLES_EMISION_ALERTAS))
 ):
     """
     Activa o desactiva una alerta existente.

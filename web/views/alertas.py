@@ -92,14 +92,19 @@ def render_alertas_view():
                     else:
                         st.error(res.get("error", "Error al emitir."))
 
-    if st.session_state.get("user_role") == "funcionario":
+    if (st.session_state.get("user_role") or "").strip().lower() in {
+        "funcionario",
+        "medico",
+        "admin",
+        "administrador",
+    }:
         st.divider()
         with st.container(border=True):
             st.markdown("##### Borradores predictivos para revisión")
             st.caption(
                 "Se calculan con las proyecciones municipales de las próximas cuatro semanas. "
                 "Solo los niveles medio, alto y crítico generan borradores; nada se publica "
-                "hasta que un funcionario lo apruebe."
+                "hasta que personal autorizado lo apruebe."
             )
 
             if not st.session_state.get("_predictive_drafts_auto_attempted"):

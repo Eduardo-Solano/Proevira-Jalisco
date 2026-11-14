@@ -215,8 +215,10 @@ class EndToEndApiTests(unittest.TestCase):
 
     def test_04_alerts_web_to_websocket_realtime_and_drafts(self):
         func = self._login("funcionario.e2e@salud.jalisco.gob.mx", "FuncPass2026!")
+        med = self._login("medico.e2e@salud.jalisco.gob.mx", "MedPass2026!")
         pac = self._login("paciente.e2e@jalisco.mx", "PacPass2026!")
         func_headers = {"Authorization": f"Bearer {func['token']}"}
+        med_headers = {"Authorization": f"Bearer {med['token']}"}
 
         # Paciente no puede emitir alertas oficiales
         forbidden = self.client.post(
@@ -225,6 +227,14 @@ class EndToEndApiTests(unittest.TestCase):
             json={"municipio_id": "14039", "nivel": "alto", "mensaje": "Intento no autorizado"},
         )
         self.assertEqual(forbidden.status_code, 403)
+
+        # Médico verificado sí puede emitir alertas oficiales
+        med_created = self.client.post(
+            "/api/v1/alerts",
+            headers=med_headers,
+            json={"municipio_id": "14039", "nivel": "medio", "mensaje": "Alerta emitida por médico."},
+        )
+        self.assertEqual(med_created.status_code, 200, med_created.text)
 
         # Cliente móvil conectado por WebSocket recibe alerta emitida desde Web en tiempo real
         with self.client.websocket_connect(f"/ws/alerts?token={pac['token']}") as ws:
