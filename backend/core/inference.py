@@ -38,12 +38,14 @@ class InferenceEngine:
         self.ultima_semana_iso_por_enfermedad: Dict[str, str] = {}
         self.raw_data: Optional[pd.DataFrame] = None
         self.municipios_info: Dict[str, Dict[str, Any]] = {}
+        self._bulk_cache: Dict[Tuple[Optional[str], str], List[Dict[str, Any]]] = {}
 
     def load(self, force: bool = False):
         """Carga modelos municipales entrenados, CSV histórico unificado y GeoJSON."""
         if self.loaded and not force:
             return
 
+        self._bulk_cache.clear()
         model_path = os.path.join(settings.MODEL_ARTIFACTS_DIR, "modelo_rf.pkl")
         csv_path = os.path.join(settings.CLEAN_DATA_DIR, "casos_municipio_semana.csv")
         geojson_path = os.path.join(settings.CLEAN_DATA_DIR, "municipios.geojson")
@@ -51,6 +53,10 @@ class InferenceEngine:
         if os.path.exists(model_path):
             art = joblib.load(model_path)
             self.modelos = art.get("modelos", {})
+            for modelo in self.modelos.values():
+                # Evita contención de hilos/procesos en contenedores con CPU limitada (p. ej. Render Free).
+                if hasattr(modelo, "n_jobs"):
+                    modelo.n_jobs = 1
             self.thresholds_municipio = art.get("thresholds_municipio", {})
             self.features = art.get("features", [])
             self.mun_cod_map = art.get("mun_cod_map", {})
@@ -93,6 +99,7 @@ class InferenceEngine:
     def reload(self):
         """Recarga modelos y series históricas desde disco tras actualizar datasets."""
         self.explainers.clear()
+        self._bulk_cache.clear()
         self.load(force=True)
 
     def _normalize_enfermedad(self, enfermedad: str) -> str:
@@ -238,6 +245,7 @@ class InferenceEngine:
         municipio_id: str,
         semana: Optional[str] = None,
         enfermedad: str = "dengue",
+        include_shap: bool = True,
     ) -> Dict[str, Any]:
         """Predicción municipal directa t+1 con riesgo y SHAP top-3."""
         if not self.loaded:
@@ -261,11 +269,13 @@ class InferenceEngine:
         pred_val, semana_pred, x_vec = self._forecast_to_target(sub, municipio_id, enf, target_monday)
         casos_red, nivel_riesgo, th = self._classify_risk(municipio_id, enf, pred_val)
 
-        _, shap_all = self._compute_shap_items(enf, x_vec)
-        shap_top3 = [
-            {"feature": item["feature"], "valor": item["shap"]}
-            for item in shap_all[:3]
-        ]
+        shap_top3: List[Dict[str, Any]] = []
+        if include_shap:
+            _, shap_all = self._compute_shap_items(enf, x_vec)
+            shap_top3 = [
+                {"feature": item["feature"], "valor": item["shap"]}
+                for item in shap_all[:3]
+            ]
 
         info = self.municipios_info.get(municipio_id, {"nombre": municipio_id})
         return {
@@ -322,10 +332,20 @@ class InferenceEngine:
         if not self.loaded:
             self.load()
 
+        cache_key = (semana, self._normalize_enfermedad(enfermedad))
+        cached = self._bulk_cache.get(cache_key)
+        if cached is not None:
+            return [dict(item) for item in cached]
+
         results = []
         for mid, info in self.municipios_info.items():
             try:
-                pred = self.predict_municipio(mid, semana=semana, enfermedad=enfermedad)
+                pred = self.predict_municipio(
+                    mid,
+                    semana=semana,
+                    enfermedad=enfermedad,
+                    include_shap=False,
+                )
                 results.append(
                     {
                         "municipio": mid,
@@ -341,6 +361,8 @@ class InferenceEngine:
                 )
             except Exception:
                 continue
+        if results:
+            self._bulk_cache[cache_key] = [dict(item) for item in results]
         return results
 
     def get_history(

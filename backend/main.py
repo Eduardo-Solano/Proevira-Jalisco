@@ -83,4 +83,6 @@ async def on_startup():
     from backend.db.models import AlertaPredictivaBorrador, ImportacionDataset
     AlertaPredictivaBorrador.__table__.create(bind=engine, checkfirst=True)
     ImportacionDataset.__table__.create(bind=engine, checkfirst=True)
+    from backend.core.inference import inference_engine
+    inference_engine.load()
     logger.info(f"API Documentación disponible en /docs")
