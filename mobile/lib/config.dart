@@ -10,5 +10,5 @@ class AppConfig {
     'WS_BASE_URL',
     defaultValue: 'ws://10.0.2.2:8000/ws/alerts',
   );
-  static const appName = 'Proevira Jalisco';
+  static const appName = 'VIRALES App';
 }

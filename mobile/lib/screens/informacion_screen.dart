@@ -9,7 +9,7 @@ class InformacionScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            '¿Cómo usar Proevira?',
+            '¿Cómo usar VIRALES App?',
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 8),

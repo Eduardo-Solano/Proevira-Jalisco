@@ -9,16 +9,16 @@ import 'screens/home_paciente.dart';
 import 'screens/login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() => runApp(const ProeviraApp());
+void main() => runApp(const ViralesApp());
 
-class ProeviraApp extends StatefulWidget {
-  const ProeviraApp({super.key});
+class ViralesApp extends StatefulWidget {
+  const ViralesApp({super.key});
 
   @override
-  State<ProeviraApp> createState() => _ProeviraAppState();
+  State<ViralesApp> createState() => _ViralesAppState();
 }
 
-class _ProeviraAppState extends State<ProeviraApp> {
+class _ViralesAppState extends State<ViralesApp> {
   final api = ApiClient();
   final database = DatabaseHelper.instance;
   late final AuthService auth;
@@ -93,7 +93,7 @@ class _ProeviraAppState extends State<ProeviraApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'Proevira Jalisco',
+        title: 'VIRALES App',
         debugShowCheckedModeBanner: false,
         themeMode: themeMode,
         theme: ThemeData(

@@ -71,7 +71,7 @@ class _HomePacienteState extends State<HomePaciente> {
       ),
     ];
     const titles = [
-      'Alertas activas',
+      'VIRALES App',
       'Seguimiento de síntomas',
       'Unidades médicas',
       'Guía',
@@ -80,7 +80,32 @@ class _HomePacienteState extends State<HomePaciente> {
     ];
     return Scaffold(
       appBar: AppBar(
-        title: Text(titles[index]),
+        title: index == 0
+            ? RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'VIRALES',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.8,
+                      ),
+                    ),
+                    TextSpan(
+                      text: ' App',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: .3,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : Text(titles[index]),
         actions: [
           IconButton(
             tooltip: 'Cerrar sesión',

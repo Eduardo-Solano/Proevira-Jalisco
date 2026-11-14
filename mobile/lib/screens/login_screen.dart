@@ -53,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       const Icon(Icons.health_and_safety, size: 72),
                       const SizedBox(height: 12),
-                      Text('Proevira Jalisco',
+                      Text('VIRALES App',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.headlineMedium),
                       const SizedBox(height: 8),
