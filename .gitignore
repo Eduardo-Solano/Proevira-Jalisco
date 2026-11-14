@@ -1,4 +1,25 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+.venv/
+venv/
+
+# Secretos y configuración local
+.env
+*.pem
+*.json.bak
+
+# Base de datos SQLite local y respaldos
 proevira.db
+proevira.db.bak
+*.db-journal
+*.db-wal
+*.sqlite3
+
+# Datos crudos y temporales
+data/raw/*
+*.tmp
+
+# Sistema operativo
+.DS_Store
