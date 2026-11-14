@@ -143,3 +143,25 @@ class Sintoma(Base):
     synced = Column(Boolean, default=True)
     ts_registro = Column(DateTime, default=datetime.datetime.utcnow)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class ImportacionDataset(Base):
+    __tablename__ = "importaciones_dataset"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    archivo_nombre = Column(String(255), nullable=False)
+    archivo_hash = Column(String(64), nullable=False, index=True)
+    enfermedad = Column(String(30), nullable=False, index=True)
+    fuente = Column(String(150), nullable=True)
+    ruta_guardada = Column(String(300), nullable=False)
+    filas_totales = Column(Integer, nullable=False, default=0)
+    filas_validas = Column(Integer, nullable=False, default=0)
+    filas_descartadas = Column(Integer, nullable=False, default=0)
+    rango_fechas = Column(String(64), nullable=True)
+    ultima_semana = Column(String(20), nullable=True)
+    usuario_email = Column(String(150), nullable=True)
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
+        nullable=False,
+    )

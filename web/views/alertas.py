@@ -154,7 +154,7 @@ def render_alertas_view():
                         st.markdown(
                             f"**{nivel.upper()} · {municipio_nombre} · {enfermedad}**  \n"
                             f"Semana que inicia el **{fecha}** · "
-                            f"**{borrador.get('casos_esperados', 0):,.1f} casos estimados**"
+                            f"**{int(round(float(borrador.get('casos_esperados', 0)))):,} casos estimados**"
                         )
                         st.caption(borrador.get("mensaje", ""))
                         aprobar_col, descartar_col = st.columns(2)

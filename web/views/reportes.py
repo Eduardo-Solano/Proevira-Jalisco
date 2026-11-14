@@ -31,7 +31,7 @@ def _reporte(tipo: str, enfermedad: str, municipio: str | None, periodo: str) ->
         resultado = api.get_prediction_history(municipio, enfermedad=codigo, semanas=semanas)
         if tipo == "comparativo":
             observados = sum(int(item["casos"]) for item in resultado.get("historico", []))
-            proyectados = round(sum(float(item["casos"]) for item in resultado.get("prediccion", [])), 1)
+            proyectados = sum(int(round(float(item["casos"]))) for item in resultado.get("prediccion", []))
             filas.append(
                 {
                     "Enfermedad": etiqueta,
@@ -56,7 +56,7 @@ def _reporte(tipo: str, enfermedad: str, municipio: str | None, periodo: str) ->
                     "Enfermedad": etiqueta,
                     "Municipio": MUNICIPIOS_JALISCO[municipio]["nombre"],
                     "Semana": item["semana"],
-                    "Casos": item["casos"],
+                    "Casos": int(round(float(item["casos"]))),
                     "Tipo de valor": "Proyección (no confirmada)",
                 }
                 for item in resultado.get("prediccion", [])
@@ -84,19 +84,23 @@ def render_reportes_view():
     with region_col:
         opciones_region = ["todas"] + list(MUNICIPIOS_JALISCO) if tipo == "geografico" else list(MUNICIPIOS_JALISCO)
         municipio = st.selectbox(
-            "Región",
+            "Municipio",
             opciones_region,
-            format_func=lambda codigo: "Todas las regiones" if codigo == "todas" else MUNICIPIOS_JALISCO[codigo]["nombre"],
+            format_func=lambda codigo: "Todos los municipios" if codigo == "todas" else MUNICIPIOS_JALISCO[codigo]["nombre"],
             key="report_municipio",
         )
     with periodo_col:
-        semana_prediccion = (
-            "2026-W20"
-            if DEMO_MODE
-            else api.get_model_info().get("semana_prediccion")
-        )
+        if DEMO_MODE:
+            semana_prediccion = "2026-W20"
+        else:
+            info_modelo = api.get_model_info()
+            enf_key = "covid" if enfermedad == "covid-19" else enfermedad
+            semana_prediccion = (
+                info_modelo.get("por_enfermedad", {}).get(enf_key, {}).get("semana_prediccion")
+                or info_modelo.get("semana_prediccion")
+            )
         if tipo == "geografico" and not semana_prediccion:
-            st.info("El backend no reporta una semana de proyección disponible.")
+            st.info("No hay una semana de proyección disponible en este momento.")
             return
         opciones_periodo = (
             [semana_prediccion]
@@ -112,8 +116,8 @@ def render_reportes_view():
 
     st.markdown("#### Catálogo de reportes disponibles")
     st.caption(
-        "Los reportes de evolución y predicción se consultan por región; "
-        "el comparativo presenta las tres enfermedades y la distribución usa la región y semana seleccionadas."
+        "Consulta y descarga la evolución semanal, la comparativa entre enfermedades "
+        "o la distribución por municipio."
     )
 
     datos = _reporte(tipo, enfermedad, None if municipio == "todas" else municipio, periodo)
@@ -126,8 +130,12 @@ def render_reportes_view():
     with st.container(border=True):
         st.markdown(f'<div class="panel-title">{tipo_label}</div>', unsafe_allow_html=True)
         if tipo == "geografico":
-            columnas = [col for col in ("municipio", "nivel_riesgo", "casos_esperados") if col in datos]
-            st.dataframe(datos[columnas], hide_index=True, use_container_width=True)
+            col_casos = "casos_esperados_redondeados" if "casos_esperados_redondeados" in datos else "casos_esperados"
+            columnas = [col for col in ("municipio", "nivel_riesgo", col_casos) if col in datos]
+            tabla_geo = datos[columnas].rename(columns={col_casos: "casos_estimados"})
+            if "casos_estimados" in tabla_geo:
+                tabla_geo["casos_estimados"] = pd.to_numeric(tabla_geo["casos_estimados"], errors="coerce").fillna(0).round().astype(int)
+            st.dataframe(tabla_geo, hide_index=True, use_container_width=True)
         else:
             st.dataframe(datos, hide_index=True, use_container_width=True)
         st.download_button(
