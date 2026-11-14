@@ -67,7 +67,9 @@ class InformacionScreen extends StatelessWidget {
           FilledButton.icon(
             onPressed: () async {
               final uri = Uri(scheme: 'tel', path: '911');
-              if (await canLaunchUrl(uri)) await launchUrl(uri);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
             },
             icon: const Icon(Icons.phone),
             label: const Text('Llamar al 911'),

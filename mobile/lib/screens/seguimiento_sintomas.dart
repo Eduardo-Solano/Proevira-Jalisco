@@ -102,14 +102,42 @@ class _SeguimientoSintomasState extends State<SeguimientoSintomas> {
     try {
       final response = await widget.api.postSymptoms(payload);
       await widget.database.saveSyncedSymptom(payload, response);
+      _clearForm();
       if (mounted) {
         await showDialog<void>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Seguimiento registrado'),
-            content: Text(
-              '${response['recomendacion'] ?? 'Registro enviado correctamente.'}\n\n'
-              '${response['disclaimer_medico'] ?? 'Esta aplicación no sustituye el diagnóstico médico.'}',
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  response['recomendacion'] ??
+                      'Registro enviado correctamente.',
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xfffff1ef),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xfff3b4ad),
+                    ),
+                  ),
+                  child: Text(
+                    response['disclaimer_medico'] ??
+                        'Esta aplicación es un asistente orientador y no sustituye el diagnóstico médico.',
+                    style: const TextStyle(
+                      color: Color(0xff6b7280),
+                      fontSize: 12,
+                      height: 1.35,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ),
+              ],
             ),
             actions: [
               TextButton(
@@ -122,6 +150,7 @@ class _SeguimientoSintomasState extends State<SeguimientoSintomas> {
       }
     } on ApiException {
       await widget.database.enqueueSymptoms(idLocal, jsonEncode(payload));
+      _clearForm();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -132,6 +161,20 @@ class _SeguimientoSintomasState extends State<SeguimientoSintomas> {
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  void _clearForm() {
+    temperature.clear();
+    otrosSintomas.clear();
+    fiebre = false;
+    cefalea = false;
+    dolorMuscular = false;
+    dolorArticular = false;
+    dolorRetroocular = false;
+    tos = false;
+    dificultadRespiratoria = false;
+    diasConSintomas = 1;
+    if (mounted) setState(() {});
   }
 
   @override

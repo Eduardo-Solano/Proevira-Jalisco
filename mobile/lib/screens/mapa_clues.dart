@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';
 
 import '../api/api_client.dart';
 import '../local_db/database_helper.dart';
@@ -38,6 +39,7 @@ class _MapaCluesState extends State<MapaClues> {
   bool usingSimulatedLocation = true;
   String? message;
   bool loading = true;
+  List<LatLng> routePoints = [];
 
   @override
   void initState() {
@@ -56,6 +58,7 @@ class _MapaCluesState extends State<MapaClues> {
         message = null;
         center = location;
         selectedLocation = locations.containsKey(label) ? label : null;
+        routePoints = [];
       });
     }
     try {
@@ -200,6 +203,16 @@ class _MapaCluesState extends State<MapaClues> {
                           ),
                         ],
                       ),
+                      if (routePoints.length > 1)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: routePoints,
+                              color: Theme.of(context).colorScheme.primary,
+                              strokeWidth: 5,
+                            ),
+                          ],
+                        ),
                     ],
                   ),
           ),
@@ -245,16 +258,63 @@ class _MapaCluesState extends State<MapaClues> {
             if (detail.horario != null) Text('Horario: ${detail.horario}'),
             FilledButton.icon(
               onPressed: () async {
-                final uri = Uri.parse(
-                    'https://www.google.com/maps/search/?api=1&query=${detail.lat},${detail.lon}');
-                if (await canLaunchUrl(uri)) await launchUrl(uri);
+                Navigator.pop(context);
+                await drawRouteTo(detail);
               },
-              icon: const Icon(Icons.directions),
-              label: const Text('Abrir indicaciones'),
+              icon: const Icon(Icons.route),
+              label: const Text('Marcar ruta en el mapa'),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> drawRouteTo(Clue clue) async {
+    final uri = Uri.parse(
+      'https://router.project-osrm.org/route/v1/driving/'
+      '${center.longitude},${center.latitude};'
+      '${clue.lon},${clue.lat}?overview=full&geometries=geojson',
+    );
+    try {
+      final response = await http
+          .get(uri, headers: {'User-Agent': 'VIRALES-App/1.0'})
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('El servicio de rutas no respondió correctamente.');
+      }
+      final body = jsonDecode(response.body);
+      final routes = body is Map ? body['routes'] : null;
+      final firstRoute = routes is List && routes.isNotEmpty ? routes.first : null;
+      final geometry = firstRoute is Map ? firstRoute['geometry'] : null;
+      final coordinates = geometry is Map ? geometry['coordinates'] : null;
+      if (coordinates is! List || coordinates.isEmpty) {
+        throw Exception('No se encontró una ruta para esta unidad.');
+      }
+      final points = coordinates
+          .whereType<List>()
+          .where((point) => point.length >= 2)
+          .map((point) => LatLng(
+                (point[1] as num).toDouble(),
+                (point[0] as num).toDouble(),
+              ))
+          .toList();
+      if (points.length < 2) {
+        throw Exception('La ruta recibida está incompleta.');
+      }
+      if (mounted) {
+        setState(() {
+          routePoints = points;
+          message = 'Ruta marcada hacia ${clue.nombre}.';
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          message = 'No se pudo marcar la ruta: $error';
+          routePoints = [];
+        });
+      }
+    }
   }
 }
