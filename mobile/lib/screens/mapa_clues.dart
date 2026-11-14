@@ -170,7 +170,7 @@ class _MapaCluesState extends State<MapaClues> {
                       TileLayer(
                         urlTemplate:
                             'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.proevira.jalisco',
+                        userAgentPackageName: 'com.virales.app',
                       ),
                       MarkerLayer(
                         markers: [

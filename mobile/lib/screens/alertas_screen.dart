@@ -333,7 +333,7 @@ class _AlertasScreenState extends State<AlertasScreen> {
                           TileLayer(
                             urlTemplate:
                                 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'com.proevira.jalisco',
+                            userAgentPackageName: 'com.virales.app',
                           ),
                           MarkerLayer(
                             markers: incidence
