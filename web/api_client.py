@@ -256,6 +256,31 @@ class ApiClient:
             return None
         return self._request("GET", "/model/metrics")
 
+    def get_prediction(
+        self,
+        municipio_id: str,
+        semana: Optional[str] = None,
+        enfermedad: str = "dengue",
+    ) -> Dict[str, Any]:
+        enfermedad_api = self._enfermedad_api(enfermedad)
+        if DEMO_MODE:
+            meta = MUNICIPIOS_JALISCO.get(str(municipio_id), {"nombre": str(municipio_id)})
+            return {
+                "municipio": str(municipio_id),
+                "municipio_nombre": meta["nombre"],
+                "semana": semana or "Demostración",
+                "enfermedad": enfermedad_api,
+                "casos_esperados": 12.0,
+                "casos_esperados_redondeados": 12,
+                "umbrales": [2.0, 6.0, 15.0],
+                "nivel_riesgo": "alto",
+                "shap_top3": [],
+            }
+        params: Dict[str, Any] = {"municipio": municipio_id, "enfermedad": enfermedad_api}
+        if semana:
+            params["semana"] = semana
+        return self._request("GET", "/predictions", params=params)
+
     def get_predictions_bulk(self, semana: Optional[str] = None, enfermedad: str = "dengue") -> List[Dict[str, Any]]:
         enfermedad_api = self._enfermedad_api(enfermedad)
         if DEMO_MODE:
@@ -511,6 +536,51 @@ class ApiClient:
             return {"success": True, "data": data}
         except ApiError as error:
             return {"success": False, "error": str(error)}
+
+    def get_datasets(self) -> Dict[str, Any]:
+        if DEMO_MODE:
+            return {"datasets": [], "imports": []}
+        return self._request("GET", "/datasets")
+
+    def import_csv(
+        self,
+        enfermedad: str,
+        fuente: str,
+        filename: str,
+        file_bytes: bytes,
+    ) -> Dict[str, Any]:
+        if DEMO_MODE:
+            return {"success": False, "error": "Modo de demostración: la importación de CSV no está disponible."}
+        url = f"{self.base_url}/datasets/import"
+        headers: Dict[str, str] = {}
+        token = st.session_state.get("auth_token")
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
+        try:
+            response = requests.post(
+                url,
+                data={"enfermedad": self._enfermedad_api(enfermedad), "fuente": fuente},
+                files={"file": (filename, file_bytes, "text/csv")},
+                headers=headers,
+                timeout=max(REQUEST_TIMEOUT, 60.0),
+            )
+        except requests.RequestException as error:
+            return {"success": False, "error": f"No se pudo conectar con la API ({url}): {error}"}
+
+        if not response.ok:
+            try:
+                body = response.json()
+            except ValueError:
+                body = {}
+            detail = body.get("detail") if isinstance(body, dict) else None
+            return {"success": False, "error": detail or response.text or f"HTTP {response.status_code}"}
+
+        self._clear_read_cache()
+        try:
+            return {"success": True, "data": response.json()}
+        except ValueError:
+            return {"success": False, "error": "La API devolvió una respuesta inválida al importar."}
 
 
 api = ApiClient()

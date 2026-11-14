@@ -31,11 +31,21 @@ def _salir_del_panel():
         api.logout()
 
 
+_ROLES_ETIQUETAS = {
+    "medico": "Personal médico",
+    "admin": "Administrador",
+    "ciudadano": "Vigilancia ciudadana",
+}
+
+
 def _perfil_lateral():
     if DEMO_MODE:
         correo = "Usuario de demostración"
+        rol_texto = "Modo demostración"
     else:
         correo = st.session_state.get("user_email") or "Usuario autenticado"
+        rol_raw = (st.session_state.get("user_role") or "").strip().lower()
+        rol_texto = _ROLES_ETIQUETAS.get(rol_raw, "Sesión activa")
 
     usuario = correo.split("@", 1)[0].strip()
     iniciales = "".join(parte[0] for parte in usuario.replace("_", " ").replace(".", " ").split() if parte)
@@ -43,7 +53,10 @@ def _perfil_lateral():
     return (
         '<div class="sidebar-profile">'
         f'<div class="profile-avatar" role="img" aria-label="Perfil de usuario">{escape(iniciales)}</div>'
+        '<div class="profile-meta">'
+        f'<span class="profile-role">{escape(rol_texto)}</span>'
         f'<strong class="profile-email" title="{escape(correo, quote=True)}">{escape(correo)}</strong>'
+        '</div>'
         '</div>'
     )
 
@@ -72,22 +85,36 @@ st.markdown("""
     padding: 4rem 1.7rem 1rem;
 }
 section[data-testid="stSidebar"] {
-    background: #454545;
-    border-right: 1px solid #383838;
+    background: linear-gradient(180deg, #3e4144 0%, #34373a 100%);
+    border-right: 1px solid #2d3033;
 }
 section[data-testid="stSidebar"]:has(button[aria-label="Collapse sidebar"]) {
-    width: 260px !important;
-    min-width: 260px !important;
-    flex-basis: 260px !important;
+    width: 276px !important;
+    min-width: 276px !important;
+    flex-basis: 276px !important;
 }
-section[data-testid="stSidebar"] > div { background: #454545; }
+section[data-testid="stSidebar"] > div {
+    background: transparent;
+}
 section[data-testid="stSidebar"] [data-testid="stSidebarHeader"] {
-    height: 40px !important;
-    min-height: 40px !important;
-    flex: 0 0 40px !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    flex: 0 0 36px !important;
+    padding: .45rem .85rem 0 !important;
 }
 section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
-    padding-top: 0 !important;
+    padding: .35rem 1rem 1rem !important;
+    min-height: calc(100vh - 38px);
+    display: flex;
+    flex-direction: column;
+}
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] > div,
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] > div > div[data-testid="stVerticalBlock"],
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] > div > div > div[data-testid="stVerticalBlock"] {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: .65rem;
 }
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: #eaf1ee; }
 button[aria-label="Collapse sidebar"],
@@ -97,91 +124,163 @@ button[aria-label="Expand sidebar"] {
     color: #477a70 !important;
 }
 section[data-testid="stSidebar"] button[aria-label="Collapse sidebar"] {
-    color: #d3e2dd !important;
+    color: #cbd8d4 !important;
 }
 .sidebar-brand {
-    padding: .1rem 0 .75rem;
-    border-bottom: 1px solid rgba(255,255,255,.16);
-    color: #f0b65c;
-    font-size: 1.2rem;
-    font-weight: 700;
-    letter-spacing: .08em;
+    padding: 0 0 .9rem;
+    margin-bottom: .35rem;
+    border-bottom: 1px solid rgba(255,255,255,.12);
 }
-.sidebar-brand span {
+.sidebar-brand-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+}
+.sidebar-brand-title {
+    color: #f0b65c;
+    font-size: 1.24rem;
+    font-weight: 800;
+    letter-spacing: .09em;
+    line-height: 1.1;
+}
+.sidebar-brand-badge {
+    padding: .16rem .48rem;
+    border-radius: 999px;
+    background: rgba(240,182,92,.14);
+    border: 1px solid rgba(240,182,92,.32);
+    color: #f5ca82;
+    font-size: .62rem;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+}
+.sidebar-brand-sub {
     display: block;
-    margin-top: .2rem;
+    margin-top: .28rem;
     color: #b7ceca;
-    font-size: .68rem;
+    font-size: .72rem;
     font-weight: 500;
-    letter-spacing: .02em;
+    letter-spacing: .01em;
 }
 .sidebar-profile {
     display: flex;
     align-items: center;
-    gap: .55rem;
+    gap: .7rem;
     min-width: 0;
-    margin: 0 0 .8rem;
+    margin: .1rem 0 .45rem;
+    padding: .7rem .78rem;
+    border-radius: 10px;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.10);
 }
 .profile-avatar {
     display: grid;
-    flex: 0 0 32px;
-    width: 32px;
-    height: 32px;
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
     place-items: center;
     border-radius: 50%;
-    background: #f0b65c;
-    color: #393939;
-    font-size: .7rem;
+    background: linear-gradient(135deg, #f3c171 0%, #e09e3e 100%);
+    box-shadow: 0 0 0 2px rgba(240,182,92,.22);
+    color: #2f3133;
+    font-size: .78rem;
+    font-weight: 800;
+    letter-spacing: .04em;
+}
+.profile-meta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: .1rem;
+}
+.profile-role {
+    color: #b7ceca;
+    font-size: .64rem;
     font-weight: 700;
-    letter-spacing: .03em;
+    letter-spacing: .06em;
+    text-transform: uppercase;
 }
 .profile-email {
     min-width: 0;
     overflow: hidden;
-    color: #fff;
-    font-size: .74rem;
+    color: #ffffff;
+    font-size: .76rem;
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.sidebar-section {
-    margin: 1rem 0 .45rem;
-    color: #c7c7c7;
-    font-size: .66rem;
-    font-weight: 700;
-    letter-spacing: .8px;
-    text-transform: uppercase;
-}
 section[data-testid="stSidebar"] div[data-testid="stRadio"] {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: .5rem !important;
+    width: 100% !important;
+    margin-top: .25rem !important;
     padding: 0 !important;
 }
-section[data-testid="stSidebar"] div[data-testid="stRadio"] > div[role="radiogroup"] {
-    gap: .22rem;
+section[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    align-items: stretch !important;
+    margin: 0 !important;
+    gap: .36rem;
+}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] [data-testid="stWidgetLabel"] {
+    display: block !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 .2rem !important;
+}
+section[data-testid="stSidebar"] div[data-testid="stRadio"] [data-testid="stWidgetLabel"] p {
+    margin: 0 !important;
+    color: #9fb0ab !important;
+    font-size: .66rem !important;
+    font-weight: 700 !important;
+    letter-spacing: .1em !important;
+    text-transform: uppercase !important;
+    line-height: 1.3 !important;
 }
 section[data-testid="stSidebar"] label[data-testid="stRadioOption"] > div > div:first-child {
     display: none !important;
 }
-section[data-testid="stSidebar"] div[data-testid="stRadio"] label {
-    min-height: 40px;
-    padding: .55rem .8rem;
-    border: 0;
-    border-radius: 7px;
-    color: #eaf1ee;
-    transition: background .15s ease, color .15s ease;
+section[data-testid="stSidebar"] label[data-testid="stRadioOption"] {
+    display: flex !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    min-height: 44px;
+    margin: 0 !important;
+    padding: .62rem .88rem;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    color: #e4ece9;
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
-section[data-testid="stSidebar"] div[data-testid="stRadio"] label:hover {
-    background: rgba(255,255,255,.09);
-    color: #fff;
+section[data-testid="stSidebar"] label[data-testid="stRadioOption"] > div,
+section[data-testid="stSidebar"] label[data-testid="stRadioOption"] > div:last-child,
+section[data-testid="stSidebar"] label[data-testid="stRadioOption"] [data-testid="stMarkdownContainer"] {
+    width: 100% !important;
 }
-section[data-testid="stSidebar"] div[data-testid="stRadio"] label[data-selected="true"] {
-    background: #606060;
-    box-shadow: inset 3px 0 #f0b65c;
-    color: #fff;
+section[data-testid="stSidebar"] label[data-testid="stRadioOption"]:hover {
+    background: rgba(255,255,255,.08);
+    border-color: rgba(255,255,255,.08);
+    color: #ffffff;
 }
-section[data-testid="stSidebar"] div[data-testid="stRadio"] label p {
+section[data-testid="stSidebar"] label[data-testid="stRadioOption"][data-selected="true"] {
+    background: linear-gradient(90deg, rgba(240,182,92,.20) 0%, rgba(255,255,255,.09) 100%);
+    border-color: rgba(240,182,92,.30);
+    box-shadow: inset 3.5px 0 0 #f0b65c;
+    color: #ffffff;
+}
+section[data-testid="stSidebar"] label[data-testid="stRadioOption"] p {
     color: inherit !important;
-    font-size: .88rem;
-    font-weight: 550;
+    font-size: .89rem;
+    font-weight: 500;
+    letter-spacing: .005em;
+}
+section[data-testid="stSidebar"] label[data-testid="stRadioOption"][data-selected="true"] p {
+    font-weight: 600;
 }
 .st-key-map_modo div[role="radiogroup"] { gap: .4rem; }
 .st-key-map_modo label[data-testid="stRadioOption"] > div > div:first-child {
@@ -200,33 +299,63 @@ section[data-testid="stSidebar"] div[data-testid="stRadio"] label p {
     background: #eaf3ed;
     color: #315d53;
 }
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.st-key-sidebar_bottom),
+section[data-testid="stSidebar"] [data-testid="stLayoutWrapper"]:has(.st-key-sidebar_bottom),
+.st-key-sidebar_bottom {
+    margin-top: auto !important;
+    width: 100%;
+}
+.st-key-sidebar_bottom {
+    padding-top: 1rem;
+}
+.sidebar-scope {
+    margin-bottom: .75rem;
+    padding: .62rem .78rem;
+    border-radius: 9px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
+    color: #b7ceca;
+    font-size: .71rem;
+    line-height: 1.45;
+}
+.sidebar-scope strong {
+    display: block;
+    margin-bottom: .12rem;
+    color: #eaf1ee;
+    font-size: .73rem;
+    font-weight: 600;
+}
 .sidebar-footer {
-    position: fixed;
-    bottom: 4.5rem;
-    width: 208px;
-    padding-top: .8rem;
-    border-top: 1px solid rgba(255,255,255,.16);
-    color: #c7c7c7;
-    font-size: .72rem;
-    line-height: 1.5;
+    width: 100%;
+    padding: .78rem .15rem .55rem;
+    border-top: 1px solid rgba(255,255,255,.12);
+    color: #aeb8b5;
+    font-size: .71rem;
+    line-height: 1.45;
 }
 .sidebar-footer strong {
     display: block;
-    color: #fff;
-    font-size: .8rem;
+    color: #ffffff;
+    font-size: .79rem;
+    font-weight: 650;
 }
-.st-key-sidebar_exit { position: fixed; bottom: .8rem; width: 208px; }
+.st-key-sidebar_exit {
+    width: 100%;
+}
 .st-key-sidebar_exit button {
     width: 100%;
-    justify-content: flex-start;
-    border: 1px solid rgba(255,255,255,.2);
+    min-height: 40px;
+    border-radius: 9px;
+    border: 1px solid rgba(255,255,255,.20);
     color: #eaf1ee;
-    background: transparent;
+    background: rgba(255,255,255,.04);
+    font-weight: 600;
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
 .st-key-sidebar_exit button:hover {
-    border-color: #e0a878;
-    color: #fff;
-    background: rgba(255,255,255,.08);
+    border-color: #f0b65c;
+    color: #ffffff;
+    background: rgba(240,182,92,.14);
 }
 .exit-card {
     max-width: 560px;
@@ -464,8 +593,8 @@ div[data-testid="stRadio"] label,
 div[data-testid="stSlider"] label { color: #526861; font-weight: 600; }
 @media (max-width: 760px) {
     [data-testid="stMainBlockContainer"] { padding: 3.6rem .85rem .9rem; }
-    .sidebar-footer { position: static; width: auto; margin-top: 2rem; }
-    .st-key-sidebar_exit { position: static; width: auto; }
+    section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] { min-height: auto; }
+    .st-key-sidebar_bottom { padding-top: 1.5rem; }
     .sidebar-profile { max-width: 100%; }
     .risk-legend-note { width: 100%; margin-left: 0; }
 }
@@ -555,7 +684,7 @@ NAV = [
     "↗   Predicciones",
     "▤   Gestión de datos",
     "▧   Reportes",
-    "!   Alertas",
+    "▲   Alertas",
 ]
 
 if DEMO_MODE and st.session_state.get("demo_exit"):
@@ -577,28 +706,38 @@ elif not DEMO_MODE and not st.session_state.get("auth_token"):
     render_auth_page()
 else:
     with st.sidebar:
-        st.markdown(_perfil_lateral(), unsafe_allow_html=True)
         st.markdown(
-            '<div class="sidebar-brand">VIRALES<span>Jalisco</span></div>',
+            '<div class="sidebar-brand">'
+            '<div class="sidebar-brand-top">'
+            '<span class="sidebar-brand-title">VIRALES</span>'
+            '<span class="sidebar-brand-badge">Jalisco</span>'
+            '</div>'
+            '<span class="sidebar-brand-sub">Vigilancia epidemiológica estatal</span>'
+            '</div>',
             unsafe_allow_html=True,
         )
-        st.markdown('<div class="sidebar-section">Menú principal</div>', unsafe_allow_html=True)
+        st.markdown(_perfil_lateral(), unsafe_allow_html=True)
         seccion = st.radio(
-            "Navegación",
+            "Menú principal",
             NAV,
             index=0,
-            label_visibility="collapsed",
+            label_visibility="visible",
             key="main_navigation",
         )
-        st.markdown(
-            '<div class="sidebar-footer"><strong>Gobierno de Jalisco</strong>'
-            'Secretaría de Salud</div>',
-            unsafe_allow_html=True,
-        )
-        with st.container(key="sidebar_exit"):
-            if st.button("Salir", use_container_width=True):
-                _salir_del_panel()
-                st.rerun()
+        with st.container(key="sidebar_bottom"):
+            st.markdown(
+                '<div class="sidebar-scope">'
+                '<strong>Cobertura del sistema</strong>'
+                '12 municipios · Región Centro'
+                '</div>'
+                '<div class="sidebar-footer"><strong>Gobierno de Jalisco</strong>'
+                'Secretaría de Salud</div>',
+                unsafe_allow_html=True,
+            )
+            with st.container(key="sidebar_exit"):
+                if st.button("Cerrar sesión", use_container_width=True):
+                    _salir_del_panel()
+                    st.rerun()
 
     try:
         if seccion == NAV[0]:

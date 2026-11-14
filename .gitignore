@@ -1,5 +1,6 @@
-<<<<<<< HEAD
+cat <<'EOF' > .gitignore
 __pycache__/
 *.py[cod]
 *$py.class
-=======
+proevira.db
+EOF

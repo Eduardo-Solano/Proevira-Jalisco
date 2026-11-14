@@ -22,7 +22,10 @@ GRUPOS = [(0, 14, "edad_0_14"), (15, 44, "edad_15_44"), (45, 64, "edad_45_64"), 
 
 
 def muni_id(code) -> str:
-    return "14" + str(int(float(code))).zfill(3)
+    codigo = str(int(float(code)))
+    if len(codigo) == 5 and codigo.startswith("14"):
+        return codigo
+    return "14" + codigo.zfill(3)
 
 
 def read(pattern, **kw):
@@ -31,29 +34,40 @@ def read(pattern, **kw):
 
 
 def eventos_dengue() -> pd.DataFrame:
-    d = read("dengue/*.csv").drop_duplicates("ID_REGISTRO")
+    d = read("dengue/*.csv")
+    if "ID_REGISTRO" in d.columns:
+        con_id = d["ID_REGISTRO"].notna() & (d["ID_REGISTRO"].astype(str).str.strip() != "")
+        d = pd.concat([d[con_id].drop_duplicates("ID_REGISTRO"), d[~con_id]], ignore_index=True)
+    municipio_col = d["MUNICIPIO"] if "MUNICIPIO" in d.columns else pd.Series("", index=d.index)
+    edad_col = d["EDAD_ANOS"] if "EDAD_ANOS" in d.columns else pd.Series(pd.NA, index=d.index)
+    defuncion_col = d["DEFUNCION"] if "DEFUNCION" in d.columns else pd.Series("0", index=d.index)
     return pd.DataFrame({
         "municipio_id": d["MUNICIPIO_RES"].map(muni_id),
-        "municipio": d["MUNICIPIO"].str.strip().str.upper(),
+        "municipio": municipio_col.fillna("").astype(str).str.strip().str.upper(),
         "fecha": pd.to_datetime(d["FECHA_SIGN_SINTOMAS"], errors="coerce"),
-        "edad": pd.to_numeric(d["EDAD_ANOS"], errors="coerce"),
+        "edad": pd.to_numeric(edad_col, errors="coerce"),
         "enfermedad": "dengue",
-        "defuncion": (d["DEFUNCION"] == "1").astype(int),
+        "defuncion": (defuncion_col.astype(str).str.strip() == "1").astype(int),
     })
 
 
 def eventos_covid_flu() -> pd.DataFrame:
     c = read("datos_covid_influenza/*.csv")
+    municipio_col = c["MUNICIPIO_NOMBRE"] if "MUNICIPIO_NOMBRE" in c.columns else pd.Series("", index=c.index)
+    edad_col = c["EDAD"] if "EDAD" in c.columns else pd.Series(pd.NA, index=c.index)
     base = pd.DataFrame({
         "municipio_id": c["MUNICIPIO_RES"].map(muni_id),
-        "municipio": c["MUNICIPIO_NOMBRE"].str.strip().str.upper(),
+        "municipio": municipio_col.fillna("").astype(str).str.strip().str.upper(),
         "fecha": pd.to_datetime(c["FECHA_SINTOMAS"], errors="coerce"),
-        "edad": pd.to_numeric(c["EDAD"], errors="coerce"),
+        "edad": pd.to_numeric(edad_col, errors="coerce"),
         "defuncion": 0,
     })
     # Formato 2020-2023: CLASIFICACION_FINAL = COVID. Formato 2024+: CLASIFICACION_FINAL_COVID / CLASIFICACION_FINAL_FLU.
-    covid = c["CLASIFICACION_FINAL_COVID"].fillna(c["CLASIFICACION_FINAL"]).isin(CONFIRMADO)
-    flu = c["CLASIFICACION_FINAL_FLU"].isin(CONFIRMADO)
+    clas_covid = c.get("CLASIFICACION_FINAL_COVID", pd.Series(pd.NA, index=c.index))
+    clas_gen = c.get("CLASIFICACION_FINAL", pd.Series(pd.NA, index=c.index))
+    clas_flu = c.get("CLASIFICACION_FINAL_FLU", pd.Series(pd.NA, index=c.index))
+    covid = clas_covid.fillna(clas_gen).astype(str).str.strip().isin(CONFIRMADO)
+    flu = clas_flu.astype(str).str.strip().isin(CONFIRMADO)
     return pd.concat([
         base[covid].assign(enfermedad="covid"),
         base[flu].assign(enfermedad="influenza"),
