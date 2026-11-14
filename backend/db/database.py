@@ -4,9 +4,11 @@ from backend.config import settings
 
 
 def normalize_database_url(url: str) -> str:
-    """Normaliza URLs postgres:// entregadas por proveedores cloud a postgresql://."""
+    """Normaliza URLs postgres:// y postgresql:// para usar explícitamente psycopg2 en SQLAlchemy 2.1+."""
     if url.startswith("postgres://"):
-        return "postgresql://" + url[len("postgres://"):]
+        return "postgresql+psycopg2://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg2://" + url[len("postgresql://"):]
     return url
 
 
