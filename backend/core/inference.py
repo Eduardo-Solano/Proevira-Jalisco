@@ -39,6 +39,7 @@ class InferenceEngine:
         self.raw_data: Optional[pd.DataFrame] = None
         self.municipios_info: Dict[str, Dict[str, Any]] = {}
         self._bulk_cache: Dict[Tuple[Optional[str], str], List[Dict[str, Any]]] = {}
+        self._history_cache: Dict[Tuple[str, str, int, int], Dict[str, Any]] = {}
 
     def load(self, force: bool = False):
         """Carga modelos municipales entrenados, CSV histórico unificado y GeoJSON."""
@@ -46,6 +47,7 @@ class InferenceEngine:
             return
 
         self._bulk_cache.clear()
+        self._history_cache.clear()
         model_path = os.path.join(settings.MODEL_ARTIFACTS_DIR, "modelo_rf.pkl")
         csv_path = os.path.join(settings.CLEAN_DATA_DIR, "casos_municipio_semana.csv")
         geojson_path = os.path.join(settings.CLEAN_DATA_DIR, "municipios.geojson")
@@ -100,6 +102,7 @@ class InferenceEngine:
         """Recarga modelos y series históricas desde disco tras actualizar datasets."""
         self.explainers.clear()
         self._bulk_cache.clear()
+        self._history_cache.clear()
         self.load(force=True)
 
     def _normalize_enfermedad(self, enfermedad: str) -> str:
@@ -378,6 +381,16 @@ class InferenceEngine:
 
         municipio_id = str(municipio_id).zfill(5)
         enf = self._normalize_enfermedad(enfermedad)
+        horizonte = max(1, min(int(horizonte), 8))
+        cache_key = (municipio_id, enf, int(semanas), horizonte)
+        cached = self._history_cache.get(cache_key)
+        if cached is not None:
+            return {
+                "municipio": cached["municipio"],
+                "enfermedad": cached["enfermedad"],
+                "historico": [dict(item) for item in cached["historico"]],
+                "prediccion": [dict(item) for item in cached["prediccion"]],
+            }
 
         if self.raw_data is None:
             return {"municipio": municipio_id, "enfermedad": enf, "historico": [], "prediccion": []}
@@ -396,8 +409,7 @@ class InferenceEngine:
             for _, row in tail_hist.iterrows()
         ]
 
-        horizonte = max(1, min(int(horizonte), 8))
-        sim = sub.copy()
+        sim = sub.tail(8).copy()
         curr_date = pd.Timestamp(sim["fecha_inicio_semana"].max())
         prediccion = []
 
@@ -434,12 +446,19 @@ class InferenceEngine:
             sim = pd.concat([sim, pd.DataFrame([new_row])], ignore_index=True)
             curr_date = next_date
 
-        return {
+        result = {
             "municipio": municipio_id,
             "enfermedad": enf,
             "historico": historico,
             "prediccion": prediccion,
         }
+        self._history_cache[cache_key] = {
+            "municipio": municipio_id,
+            "enfermedad": enf,
+            "historico": [dict(item) for item in historico],
+            "prediccion": [dict(item) for item in prediccion],
+        }
+        return result
 
     def get_region_history(
         self,

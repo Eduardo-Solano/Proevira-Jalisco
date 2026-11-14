@@ -170,21 +170,29 @@ def generate_predictive_alert_drafts(
             detail="No se pudieron calcular proyecciones para los 12 municipios y las 3 enfermedades.",
         )
 
+    existing_drafts = db.query(AlertaPredictivaBorrador).all()
+    draft_by_key = {
+        (draft.municipio_id, draft.enfermedad, draft.semana): draft
+        for draft in existing_drafts
+    }
+
     created = 0
     updated = 0
     obsolete = 0
-    for (municipio_id, enfermedad), weeks in forecast_weeks.items():
-        pending = db.query(AlertaPredictivaBorrador).filter(
-            AlertaPredictivaBorrador.municipio_id == municipio_id,
-            AlertaPredictivaBorrador.enfermedad == enfermedad,
-            AlertaPredictivaBorrador.estado == "pendiente",
-        ).all()
-        for draft in pending:
-            if draft.semana not in weeks or (municipio_id, enfermedad, draft.semana) not in eligible_forecasts:
-                draft.estado = "obsoleta"
-                draft.reviewed_at = _utcnow_naive()
-                draft.reviewed_by = None
-                obsolete += 1
+    for draft in existing_drafts:
+        if draft.estado != "pendiente":
+            continue
+        weeks = forecast_weeks.get((draft.municipio_id, draft.enfermedad))
+        if weeks is None:
+            continue
+        if (
+            draft.semana not in weeks
+            or (draft.municipio_id, draft.enfermedad, draft.semana) not in eligible_forecasts
+        ):
+            draft.estado = "obsoleta"
+            draft.reviewed_at = _utcnow_naive()
+            draft.reviewed_by = None
+            obsolete += 1
 
     for key, point in eligible_forecasts.items():
         municipio_id, enfermedad, semana = key
@@ -197,11 +205,7 @@ def generate_predictive_alert_drafts(
             "Borrador predictivo; requiere revisión de un funcionario y no representa "
             "una alerta oficial ni casos confirmados."
         )
-        draft = db.query(AlertaPredictivaBorrador).filter(
-            AlertaPredictivaBorrador.municipio_id == municipio_id,
-            AlertaPredictivaBorrador.enfermedad == enfermedad,
-            AlertaPredictivaBorrador.semana == semana,
-        ).first()
+        draft = draft_by_key.get((municipio_id, enfermedad, semana))
 
         if draft is None:
             db.add(
