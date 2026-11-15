@@ -3,9 +3,12 @@ Vista: Consola de Alertas Epidemiológicas.
 """
 
 from datetime import date
+import html
 
 import streamlit as st
 from api_client import ApiError, api, MUNICIPIOS_JALISCO
+
+NIVELES_ALERTA = ["bajo", "medio", "alto", "crítico"]
 
 ESTILO_NIVEL = {
     "crítico": {"color": "#d32f2f", "bg": "#ffebee"},
@@ -24,6 +27,13 @@ def _fecha_inicio_semana(semana: str) -> str:
 
 
 def render_alertas_view():
+    puede_gestionar = (st.session_state.get("user_role") or "").strip().lower() in {
+        "funcionario",
+        "medico",
+        "admin",
+        "administrador",
+    }
+
     col_feed, col_emit = st.columns([3, 2])
 
     # ── Feed de alertas ──
@@ -49,62 +59,116 @@ def render_alertas_view():
         if not alertas:
             st.info("Sin alertas activas para los filtros seleccionados.")
         else:
+            confirm_delete_id = st.session_state.get("confirm_delete_alert_id")
             for a in alertas:
-                niv = a.get("nivel", "medio").lower()
+                alert_id = a.get("id")
+                niv = str(a.get("nivel", "medio")).lower()
                 s = ESTILO_NIVEL.get(niv, ESTILO_NIVEL["medio"])
+                municipio_texto = html.escape(str(a.get("municipio", "")))
+                mensaje_texto = html.escape(str(a.get("mensaje", "")))
+                ts_texto = html.escape(str(a.get("ts", "")))
+                activa = bool(a.get("activa", True))
+                estado_tag = "" if activa else " · INACTIVA"
+
                 st.markdown(f"""
                 <div style="border-left:5px solid {s['color']};background:{s['bg']};
-                            padding:0.9rem 1rem;border-radius:6px;margin-bottom:0.7rem;">
+                            padding:0.9rem 1rem;border-radius:6px;margin-bottom:0.35rem;">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
                         <span style="font-weight:700;color:{s['color']};font-size:0.88rem;">
                             <span style="display:inline-block;width:8px;height:8px;border-radius:50%;
                                          margin-right:5px;background:{s['color']};"></span>
-                            {niv.upper()} · {a.get('municipio','')}
+                            {html.escape(niv.upper())} · {municipio_texto}{estado_tag}
                         </span>
-                        <span style="font-size:0.76rem;color:#666;">{a.get('ts','')}</span>
+                        <span style="font-size:0.76rem;color:#666;">{ts_texto}</span>
                     </div>
-                    <div style="color:#334155;font-size:0.88rem;margin-top:4px;">{a.get('mensaje','')}</div>
+                    <div style="color:#334155;font-size:0.88rem;margin-top:4px;">{mensaje_texto}</div>
                 </div>""", unsafe_allow_html=True)
 
-    # ── Emisión de alerta ──
+                if puede_gestionar and alert_id is not None:
+                    act_col, del_col, _ = st.columns([1.2, 1.2, 2.6])
+                    toggle_label = "Desactivar" if activa else "Reactivar"
+                    if act_col.button(toggle_label, key=f"toggle_alert_{alert_id}", use_container_width=True):
+                        res = api.toggle_alert(alert_id, not activa)
+                        if res.get("success"):
+                            st.session_state.pop("confirm_delete_alert_id", None)
+                            st.rerun()
+                        else:
+                            st.error(res.get("error", "No se pudo actualizar la alerta."))
+
+                    if confirm_delete_id == alert_id:
+                        if del_col.button(
+                            "Confirmar borrado",
+                            key=f"confirm_del_alert_{alert_id}",
+                            type="primary",
+                            use_container_width=True,
+                        ):
+                            res = api.delete_alert(alert_id)
+                            if res.get("success"):
+                                st.session_state.pop("confirm_delete_alert_id", None)
+                                st.success("Alerta eliminada.")
+                                st.rerun()
+                            else:
+                                st.error(res.get("error", "No se pudo eliminar la alerta."))
+                        if _.button("Cancelar", key=f"cancel_del_alert_{alert_id}"):
+                            st.session_state.pop("confirm_delete_alert_id", None)
+                            st.rerun()
+                    else:
+                        if del_col.button(
+                            "Eliminar",
+                            key=f"delete_alert_{alert_id}",
+                            use_container_width=True,
+                        ):
+                            st.session_state["confirm_delete_alert_id"] = alert_id
+                            st.rerun()
+
+                st.markdown("<div style='margin-bottom:0.45rem'></div>", unsafe_allow_html=True)
+
+    # ── Emisión de alerta personalizada ──
     with col_emit:
         st.markdown("##### Emitir nueva alerta")
-        st.caption("Al guardar se difunde por WebSocket a la red médica y ciudadana.")
+        st.caption("Redacta el aviso personalizado; al guardar se difunde por WebSocket a la red médica y ciudadana.")
 
         with st.form("form_alerta"):
+            mun_opciones = ["__todas__"] + list(MUNICIPIOS_JALISCO.keys())
             mun_id = st.selectbox(
                 "Municipio",
-                list(MUNICIPIOS_JALISCO.keys()),
-                format_func=lambda k: MUNICIPIOS_JALISCO[k]["nombre"],
+                mun_opciones,
+                index=1 if len(mun_opciones) > 1 else 0,
+                format_func=lambda k: (
+                    "Toda la Región Centro (general)"
+                    if k == "__todas__"
+                    else MUNICIPIOS_JALISCO[k]["nombre"]
+                ),
             )
-            nivel = st.select_slider("Severidad", ["bajo", "medio", "alto", "crítico"], value="alto")
-            mensaje = st.text_area("Descripción", placeholder="Foco, protocolo o medidas...", height=100)
+            nivel = st.select_slider("Severidad", NIVELES_ALERTA, value="alto")
+            mensaje = st.text_area("Mensaje personalizado", placeholder="Foco, protocolo o medidas...", height=100)
             enviar = st.form_submit_button("Emitir alerta", use_container_width=True)
 
             if enviar:
                 if not mensaje.strip():
                     st.warning("Escribe el mensaje antes de emitir.")
                 else:
-                    res = api.create_alert(mun_id, nivel, mensaje)
+                    target_mun = None if mun_id == "__todas__" else mun_id
+                    res = api.create_alert(target_mun, nivel, mensaje.strip())
                     if res.get("success"):
-                        st.success(f"Alerta emitida para {MUNICIPIOS_JALISCO[mun_id]['nombre']}.")
+                        nombre_dest = (
+                            "toda la Región Centro"
+                            if target_mun is None
+                            else MUNICIPIOS_JALISCO[target_mun]["nombre"]
+                        )
+                        st.success(f"Alerta emitida para {nombre_dest}.")
                         st.rerun()
                     else:
                         st.error(res.get("error", "Error al emitir."))
 
-    if (st.session_state.get("user_role") or "").strip().lower() in {
-        "funcionario",
-        "medico",
-        "admin",
-        "administrador",
-    }:
+    if puede_gestionar:
         st.divider()
         with st.container(border=True):
             st.markdown("##### Borradores predictivos para revisión")
             st.caption(
-                "Se calculan con las proyecciones municipales de las próximas cuatro semanas. "
-                "Solo los niveles medio, alto y crítico generan borradores; nada se publica "
-                "hasta que personal autorizado lo apruebe."
+                "Se detectan con las proyecciones municipales de las próximas cuatro semanas "
+                "(niveles medio, alto y crítico). Personaliza la severidad y el mensaje antes de emitir; "
+                "nada se publica con formato automático."
             )
 
             if not st.session_state.get("_predictive_drafts_auto_attempted"):
@@ -147,40 +211,63 @@ def render_alertas_view():
             elif borradores:
                 st.caption(f"{len(borradores)} borrador(es) pendiente(s) de revisión.")
                 for borrador in borradores:
-                    nivel = borrador.get("nivel", "medio").lower()
+                    draft_id = borrador["id"]
+                    nivel_sugerido = str(borrador.get("nivel", "medio")).lower()
+                    if nivel_sugerido not in NIVELES_ALERTA:
+                        nivel_sugerido = "medio"
                     municipio_id = str(borrador.get("municipio", ""))
                     municipio_nombre = MUNICIPIOS_JALISCO.get(
                         municipio_id, {"nombre": municipio_id or "Municipio"}
                     )["nombre"]
-                    enfermedad = borrador.get("enfermedad", "").upper()
+                    enfermedad = str(borrador.get("enfermedad", "")).upper()
                     fecha = _fecha_inicio_semana(borrador.get("semana", ""))
 
                     with st.container(border=True):
                         st.markdown(
-                            f"**{nivel.upper()} · {municipio_nombre} · {enfermedad}**  \n"
+                            f"**{municipio_nombre} · {enfermedad}** (nivel sugerido: **{nivel_sugerido.upper()}**)  \n"
                             f"Semana que inicia el **{fecha}** · "
                             f"**{int(round(float(borrador.get('casos_esperados', 0)))):,} casos estimados**"
                         )
-                        st.caption(borrador.get("mensaje", ""))
+                        nivel_editado = st.selectbox(
+                            "Severidad de la alerta",
+                            NIVELES_ALERTA,
+                            index=NIVELES_ALERTA.index(nivel_sugerido),
+                            key=f"draft_nivel_{draft_id}",
+                        )
+                        mensaje_personalizado = st.text_area(
+                            "Mensaje personalizado de la alerta",
+                            value="",
+                            placeholder=f"Redacta el aviso y medidas recomendadas para {municipio_nombre} ({enfermedad})...",
+                            key=f"draft_mensaje_{draft_id}",
+                            height=90,
+                        )
                         aprobar_col, descartar_col = st.columns(2)
                         if aprobar_col.button(
                             "Aprobar y emitir",
-                            key=f"approve_predictive_draft_{borrador['id']}",
+                            key=f"approve_predictive_draft_{draft_id}",
                             type="primary",
                             use_container_width=True,
                         ):
-                            result = api.review_predicted_alert_draft(borrador["id"], "aprobar")
-                            if result.get("success"):
-                                st.success("Alerta aprobada y emitida.")
-                                st.rerun()
+                            if not mensaje_personalizado.strip():
+                                st.warning("Escribe un mensaje personalizado antes de aprobar y emitir la alerta.")
                             else:
-                                st.error(result.get("error", "No se pudo aprobar el borrador."))
+                                result = api.review_predicted_alert_draft(
+                                    draft_id,
+                                    "aprobar",
+                                    nivel=nivel_editado,
+                                    mensaje=mensaje_personalizado.strip(),
+                                )
+                                if result.get("success"):
+                                    st.success("Alerta personalizada aprobada y emitida.")
+                                    st.rerun()
+                                else:
+                                    st.error(result.get("error", "No se pudo aprobar el borrador."))
                         if descartar_col.button(
                             "Descartar",
-                            key=f"discard_predictive_draft_{borrador['id']}",
+                            key=f"discard_predictive_draft_{draft_id}",
                             use_container_width=True,
                         ):
-                            result = api.review_predicted_alert_draft(borrador["id"], "descartar")
+                            result = api.review_predicted_alert_draft(draft_id, "descartar")
                             if result.get("success"):
                                 st.success("Borrador descartado.")
                                 st.rerun()

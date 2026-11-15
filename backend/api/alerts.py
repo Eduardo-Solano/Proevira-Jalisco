@@ -17,6 +17,7 @@ from backend.core.security import require_roles, decode_token
 from backend.core.inference import inference_engine
 
 router = APIRouter(tags=["Alertas"])
+NIVELES_ALERTA_VALIDOS = {"bajo", "medio", "alto", "crítico"}
 NIVELES_ALERTA_PREDICTIVA = {"medio", "alto", "crítico"}
 ROLES_EMISION_ALERTAS = ["funcionario", "medico", "admin", "administrador"]
 
@@ -295,10 +296,32 @@ async def review_predictive_alert_draft(
 
     alerta = None
     if request.decision == "aprobar":
+        nivel_final = draft.nivel
+        if request.nivel is not None:
+            nivel_norm = request.nivel.strip().lower()
+            if nivel_norm not in NIVELES_ALERTA_VALIDOS:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El nivel debe ser 'bajo', 'medio', 'alto' o 'crítico'",
+                )
+            nivel_final = nivel_norm
+
+        mensaje_final = draft.mensaje
+        if request.mensaje is not None:
+            mensaje_limpio = request.mensaje.strip()
+            if not mensaje_limpio:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El mensaje de la alerta no puede estar vacío",
+                )
+            mensaje_final = mensaje_limpio
+
+        draft.nivel = nivel_final
+        draft.mensaje = mensaje_final
         alerta = Alerta(
             municipio_id=draft.municipio_id,
-            nivel=draft.nivel,
-            mensaje=draft.mensaje,
+            nivel=nivel_final,
+            mensaje=mensaje_final,
             activa=True,
             created_at=_utcnow_naive(),
         )
@@ -342,6 +365,29 @@ def update_alert(
     db.commit()
 
     return {"id": alerta.id, "activa": alerta.activa}
+
+
+@router.delete("/alerts/{alert_id}")
+def delete_alert(
+    alert_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_roles(ROLES_EMISION_ALERTAS)),
+):
+    """
+    Elimina manualmente una alerta existente y desvincula posibles borradores predictivos.
+    """
+    alerta = db.query(Alerta).filter(Alerta.id == alert_id).first()
+    if not alerta:
+        raise HTTPException(status_code=404, detail="Alerta no encontrada")
+
+    db.query(AlertaPredictivaBorrador).filter(
+        AlertaPredictivaBorrador.alerta_id == alert_id
+    ).update({"alerta_id": None})
+
+    db.delete(alerta)
+    db.commit()
+
+    return {"id": alert_id, "eliminada": True}
 
 
 @router.websocket("/ws/alerts")

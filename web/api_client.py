@@ -134,6 +134,11 @@ class ApiClient:
             return False
         return health.get("status") == "ok"
 
+    def get_system_health(self) -> Dict[str, Any]:
+        if DEMO_MODE:
+            return {"status": "demo", "modelo_cargado": True, "db": "demo"}
+        return self._request("GET", "/health", root_path=True)
+
     def login(self, email: str, password: str) -> Dict[str, Any]:
         if DEMO_MODE:
             return {"success": False, "error": "El inicio de sesión no está disponible en modo de demostración."}
@@ -502,20 +507,32 @@ class ApiClient:
             params["municipio"] = municipio_id
         return self._request("GET", "/alerts/predictive-drafts", params=params)
 
-    def review_predicted_alert_draft(self, draft_id: int, decision: str) -> Dict[str, Any]:
+    def review_predicted_alert_draft(
+        self,
+        draft_id: int,
+        decision: str,
+        *,
+        nivel: Optional[str] = None,
+        mensaje: Optional[str] = None,
+    ) -> Dict[str, Any]:
         if DEMO_MODE:
             return {"success": False, "error": "El modo demostración no guarda ni publica alertas."}
+        payload: Dict[str, Any] = {"decision": decision}
+        if nivel is not None:
+            payload["nivel"] = nivel
+        if mensaje is not None:
+            payload["mensaje"] = mensaje
         try:
             data = self._request(
                 "PATCH",
                 f"/alerts/predictive-drafts/{draft_id}",
-                json={"decision": decision},
+                json=payload,
             )
             return {"success": True, "data": data}
         except ApiError as error:
             return {"success": False, "error": str(error)}
 
-    def create_alert(self, municipio_id: str, nivel: str, mensaje: str) -> Dict[str, Any]:
+    def create_alert(self, municipio_id: Optional[str], nivel: str, mensaje: str) -> Dict[str, Any]:
         if DEMO_MODE:
             return {"success": False, "error": "Modo de demostración: la alerta no se envió."}
         try:
@@ -528,7 +545,7 @@ class ApiClient:
         except ApiError as error:
             return {"success": False, "error": str(error)}
 
-    def toggle_alert(self, alert_id: str, activa: bool) -> Dict[str, Any]:
+    def toggle_alert(self, alert_id: Any, activa: bool) -> Dict[str, Any]:
         if DEMO_MODE:
             return {"success": False, "error": "Modo de demostración: no se modificaron alertas."}
         try:
@@ -536,6 +553,144 @@ class ApiClient:
             return {"success": True, "data": data}
         except ApiError as error:
             return {"success": False, "error": str(error)}
+
+    def delete_alert(self, alert_id: Any) -> Dict[str, Any]:
+        if DEMO_MODE:
+            return {"success": False, "error": "Modo de demostración: no se eliminaron alertas."}
+        try:
+            data = self._request("DELETE", f"/alerts/{alert_id}")
+            return {"success": True, "data": data}
+        except ApiError as error:
+            return {"success": False, "error": str(error)}
+
+    def get_users(
+        self,
+        *,
+        role: Optional[str] = None,
+        verificado: Optional[bool] = None,
+        search: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        if DEMO_MODE:
+            return [
+                {
+                    "uid": "usr_funcionario_001",
+                    "email": "admin@proevira.jalisco.gob.mx",
+                    "role": "funcionario",
+                    "municipio_id": "14039",
+                    "institucion": "Secretaría de Salud Jalisco",
+                    "cedula": None,
+                    "verificado": True,
+                    "created_at": "2026-11-01T10:00:00",
+                },
+                {
+                    "uid": "usr_medico_pendiente",
+                    "email": "medico.pendiente@salud.jalisco.gob.mx",
+                    "role": "medico",
+                    "municipio_id": "14120",
+                    "institucion": "Centro de Salud Zapopan Norte",
+                    "cedula": "MED-87654321",
+                    "verificado": False,
+                    "created_at": "2026-11-10T09:30:00",
+                },
+            ]
+        params: Dict[str, Any] = {}
+        if role:
+            params["role"] = role
+        if verificado is not None:
+            params["verificado"] = verificado
+        if search:
+            params["search"] = search
+        return self._request("GET", "/auth/users", params=params)
+
+    def verify_medico(self, uid: str) -> Dict[str, Any]:
+        if DEMO_MODE:
+            return {"success": False, "error": "Modo de demostración: no se verificó el médico."}
+        try:
+            data = self._request("POST", f"/auth/verify-medico/{uid}")
+            return {"success": True, "data": data}
+        except ApiError as error:
+            return {"success": False, "error": str(error)}
+
+    def create_user(
+        self,
+        *,
+        email: str,
+        password: str,
+        role: str,
+        municipio_id: Optional[str] = None,
+        institucion: Optional[str] = None,
+        cedula: Optional[str] = None,
+        verificado: bool = True,
+    ) -> Dict[str, Any]:
+        if DEMO_MODE:
+            return {"success": False, "error": "Modo de demostración: no se crean usuarios."}
+        payload: Dict[str, Any] = {
+            "email": email,
+            "password": password,
+            "role": role,
+            "verificado": verificado,
+        }
+        if municipio_id:
+            payload["municipio_id"] = municipio_id
+        if institucion:
+            payload["institucion"] = institucion
+        if cedula:
+            payload["cedula"] = cedula
+        try:
+            data = self._request("POST", "/auth/users", json=payload)
+            return {"success": True, "data": data}
+        except ApiError as error:
+            return {"success": False, "error": str(error)}
+
+    def update_user(
+        self,
+        uid: str,
+        *,
+        role: Optional[str] = None,
+        municipio_id: Optional[str] = None,
+        clear_municipio: bool = False,
+        institucion: Optional[str] = None,
+        cedula: Optional[str] = None,
+        verificado: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        if DEMO_MODE:
+            return {"success": False, "error": "Modo de demostración: no se modificaron usuarios."}
+        payload: Dict[str, Any] = {"clear_municipio": clear_municipio}
+        if role is not None:
+            payload["role"] = role
+        if not clear_municipio and municipio_id is not None:
+            payload["municipio_id"] = municipio_id
+        if institucion is not None:
+            payload["institucion"] = institucion
+        if cedula is not None:
+            payload["cedula"] = cedula
+        if verificado is not None:
+            payload["verificado"] = verificado
+        try:
+            data = self._request("PATCH", f"/auth/users/{uid}", json=payload)
+            return {"success": True, "data": data}
+        except ApiError as error:
+            return {"success": False, "error": str(error)}
+
+    def delete_user(self, uid: str) -> Dict[str, Any]:
+        if DEMO_MODE:
+            return {"success": False, "error": "Modo de demostración: no se eliminaron usuarios."}
+        try:
+            data = self._request("DELETE", f"/auth/users/{uid}")
+            return {"success": True, "data": data}
+        except ApiError as error:
+            return {"success": False, "error": str(error)}
+
+    def get_symptoms_summary(self) -> Dict[str, Any]:
+        if DEMO_MODE:
+            return {
+                "total_reportes": 0,
+                "ultimos_7_dias": 0,
+                "por_sospecha": {"dengue": 0, "influenza": 0, "covid": 0, "indeterminado": 0},
+                "por_municipio": [],
+                "recientes": [],
+            }
+        return self._request("GET", "/symptoms/summary")
 
     def get_datasets(self) -> Dict[str, Any]:
         if DEMO_MODE:

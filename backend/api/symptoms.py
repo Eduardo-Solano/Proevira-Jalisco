@@ -131,6 +131,61 @@ def get_my_symptoms(
     return records
 
 
+@router.get("/summary")
+def get_symptoms_summary(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_roles(["funcionario", "medico", "admin", "administrador"])),
+):
+    """
+    Resumen agregado y anonimizado de reportes ciudadanos de síntomas (LFPDPPP).
+    """
+    records = db.query(Sintoma).order_by(Sintoma.ts_registro.desc()).all()
+    hace_7_dias = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(days=7)
+
+    por_sospecha = {"dengue": 0, "influenza": 0, "covid": 0, "indeterminado": 0}
+    por_municipio = {}
+    ultimos_7_dias = 0
+
+    for rec in records:
+        if rec.ts_registro and rec.ts_registro >= hace_7_dias:
+            ultimos_7_dias += 1
+        sosp = (rec.sospecha_enfermedad or "indeterminado").lower()
+        por_sospecha[sosp] = por_sospecha.get(sosp, 0) + 1
+
+        mid = rec.municipio_id or "sin_municipio"
+        bucket = por_municipio.setdefault(
+            mid,
+            {"municipio_id": rec.municipio_id, "total": 0, "dengue": 0, "influenza": 0, "covid": 0},
+        )
+        bucket["total"] += 1
+        if sosp in ("dengue", "influenza", "covid"):
+            bucket[sosp] += 1
+
+    recientes = [
+        {
+            "id": rec.id,
+            "municipio_id": rec.municipio_id,
+            "sospecha_enfermedad": rec.sospecha_enfermedad or "indeterminado",
+            "dias_con_sintomas": rec.dias_con_sintomas,
+            "temperatura": rec.temperatura,
+            "fiebre": bool(rec.fiebre),
+            "tos": bool(rec.tos),
+            "dificultad_respiratoria": bool(rec.dificultad_respiratoria),
+            "dolor_retroocular": bool(rec.dolor_retroocular),
+            "ts_registro": rec.ts_registro.isoformat() if rec.ts_registro else None,
+        }
+        for rec in records[:20]
+    ]
+
+    return {
+        "total_reportes": len(records),
+        "ultimos_7_dias": ultimos_7_dias,
+        "por_sospecha": por_sospecha,
+        "por_municipio": sorted(por_municipio.values(), key=lambda x: -x["total"]),
+        "recientes": recientes,
+    }
+
+
 @router.get("/{symptom_id}", response_model=SymptomResponse)
 def get_symptom_detail(
     symptom_id: int,

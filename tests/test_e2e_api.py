@@ -263,6 +263,61 @@ class EndToEndApiTests(unittest.TestCase):
         self.assertEqual(drafts.status_code, 200, drafts.text)
         listed_drafts = self.client.get("/api/v1/alerts/predictive-drafts?estado=pendiente", headers=func_headers)
         self.assertEqual(listed_drafts.status_code, 200)
+        draft_items = listed_drafts.json()
+        if draft_items:
+            draft_id = draft_items[0]["id"]
+            blank_msg = self.client.patch(
+                f"/api/v1/alerts/predictive-drafts/{draft_id}",
+                headers=func_headers,
+                json={"decision": "aprobar", "nivel": "alto", "mensaje": "   "},
+            )
+            self.assertEqual(blank_msg.status_code, 400)
+
+            bad_level = self.client.patch(
+                f"/api/v1/alerts/predictive-drafts/{draft_id}",
+                headers=func_headers,
+                json={"decision": "aprobar", "nivel": "extremo", "mensaje": "Aviso válido"},
+            )
+            self.assertEqual(bad_level.status_code, 400)
+
+            custom_msg = "Aviso personalizado: reforzar descacharrización en zona centro."
+            approved = self.client.patch(
+                f"/api/v1/alerts/predictive-drafts/{draft_id}",
+                headers=func_headers,
+                json={"decision": "aprobar", "nivel": "crítico", "mensaje": custom_msg},
+            )
+            self.assertEqual(approved.status_code, 200, approved.text)
+            self.assertEqual(approved.json()["nivel"], "crítico")
+            self.assertEqual(approved.json()["mensaje"], custom_msg)
+
+            all_alerts = self.client.get("/api/v1/alerts", params={"activa": True}).json()
+            custom_alert = next((a for a in all_alerts if a["mensaje"] == custom_msg), None)
+            self.assertIsNotNone(custom_alert)
+
+            # Borrar alerta vinculada a un borrador predictivo no debe fallar por FK
+            del_linked = self.client.delete(
+                f"/api/v1/alerts/{custom_alert['id']}",
+                headers=func_headers,
+            )
+            self.assertEqual(del_linked.status_code, 200, del_linked.text)
+
+        # Paciente no puede eliminar alertas; funcionario sí puede eliminar alertas de prueba
+        med_alert_id = med_created.json()["id"]
+        pac_del = self.client.delete(
+            f"/api/v1/alerts/{med_alert_id}",
+            headers={"Authorization": f"Bearer {pac['token']}"},
+        )
+        self.assertEqual(pac_del.status_code, 403)
+
+        func_del = self.client.delete(f"/api/v1/alerts/{med_alert_id}", headers=func_headers)
+        self.assertEqual(func_del.status_code, 200, func_del.text)
+        self.assertTrue(func_del.json()["eliminada"])
+
+        remaining_ids = {a["id"] for a in self.client.get("/api/v1/alerts", params={"activa": True}).json()}
+        self.assertNotIn(med_alert_id, remaining_ids)
+
+        missing_del = self.client.delete("/api/v1/alerts/999999", headers=func_headers)
+        self.assertEqual(missing_del.status_code, 404)
 
     def test_05_clues_nearest_and_offline_symptom_idempotency(self):
         pac = self._login("paciente.e2e@jalisco.mx", "PacPass2026!")
@@ -400,6 +455,75 @@ class EndToEndApiTests(unittest.TestCase):
             },
         )
         self.assertEqual(bad_muni.status_code, 400)
+
+    def test_08_admin_user_management_and_symptoms_summary(self):
+        func = self._login("funcionario.e2e@salud.jalisco.gob.mx", "FuncPass2026!")
+        med = self._login("medico.e2e@salud.jalisco.gob.mx", "MedPass2026!")
+        pac = self._login("paciente.e2e@jalisco.mx", "PacPass2026!")
+        func_headers = {"Authorization": f"Bearer {func['token']}"}
+        med_headers = {"Authorization": f"Bearer {med['token']}"}
+        pac_headers = {"Authorization": f"Bearer {pac['token']}"}
+
+        # Médico y paciente no pueden listar ni crear usuarios desde administración
+        self.assertEqual(self.client.get("/api/v1/auth/users", headers=med_headers).status_code, 403)
+        self.assertEqual(self.client.get("/api/v1/auth/users", headers=pac_headers).status_code, 403)
+
+        listed = self.client.get("/api/v1/auth/users", headers=func_headers)
+        self.assertEqual(listed.status_code, 200, listed.text)
+        self.assertGreaterEqual(len(listed.json()), 3)
+
+        created_email = f"admin.created.{uuid.uuid4().hex[:6]}@salud.jalisco.gob.mx"
+        created = self.client.post(
+            "/api/v1/auth/users",
+            headers=func_headers,
+            json={
+                "email": created_email,
+                "password": "TempUser2026!",
+                "role": "medico",
+                "municipio_id": "14120",
+                "institucion": "Hospital Zapopan",
+                "cedula": "MED-999111",
+                "verificado": False,
+            },
+        )
+        self.assertEqual(created.status_code, 201, created.text)
+        new_uid = created.json()["uid"]
+        self.assertFalse(created.json()["verificado"])
+
+        # Actualizar verificación y municipio
+        updated = self.client.patch(
+            f"/api/v1/auth/users/{new_uid}",
+            headers=func_headers,
+            json={"verificado": True, "municipio_id": "14039"},
+        )
+        self.assertEqual(updated.status_code, 200, updated.text)
+        self.assertTrue(updated.json()["verificado"])
+        self.assertEqual(updated.json()["municipio_id"], "14039")
+
+        # Funcionario no puede quitarse su propio rol ni auto-eliminarse
+        self_demote = self.client.patch(
+            f"/api/v1/auth/users/{func['uid']}",
+            headers=func_headers,
+            json={"role": "paciente"},
+        )
+        self.assertEqual(self_demote.status_code, 400)
+        self_delete = self.client.delete(
+            f"/api/v1/auth/users/{func['uid']}",
+            headers=func_headers,
+        )
+        self.assertEqual(self_delete.status_code, 400)
+
+        # Eliminar usuario creado
+        deleted = self.client.delete(f"/api/v1/auth/users/{new_uid}", headers=func_headers)
+        self.assertEqual(deleted.status_code, 200, deleted.text)
+        self.assertTrue(deleted.json()["eliminado"])
+
+        # Resumen anonimizado de síntomas móviles
+        self.assertEqual(self.client.get("/api/v1/symptoms/summary", headers=pac_headers).status_code, 403)
+        sym_summary = self.client.get("/api/v1/symptoms/summary", headers=func_headers)
+        self.assertEqual(sym_summary.status_code, 200, sym_summary.text)
+        self.assertIn("total_reportes", sym_summary.json())
+        self.assertIn("por_sospecha", sym_summary.json())
 
 
 if __name__ == "__main__":
