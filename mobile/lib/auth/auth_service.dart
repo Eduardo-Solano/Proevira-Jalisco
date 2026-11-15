@@ -43,6 +43,31 @@ class AuthService {
 
   Future<AuthSession> login(String email, String password) async {
     final data = await api.login(email, password);
+    return _savePacienteSession(data, email);
+  }
+
+  Future<AuthSession> registerPaciente({
+    required String email,
+    required String password,
+    String? municipioId,
+  }) async {
+    final data = await api.registerPaciente(
+      email: email,
+      password: password,
+      municipioId: municipioId,
+    );
+    return _savePacienteSession(
+      data,
+      email,
+      manualMunicipioSelection: municipioId != null && municipioId.isNotEmpty,
+    );
+  }
+
+  Future<AuthSession> _savePacienteSession(
+    Map<String, dynamic> data,
+    String fallbackEmail, {
+    bool? manualMunicipioSelection,
+  }) async {
     final token = '${data['token'] ?? ''}';
     final role = '${data['role'] ?? 'paciente'}';
     final uid = '${data['uid'] ?? ''}';
@@ -62,15 +87,21 @@ class AuthService {
       role: role,
       uid: uid,
       municipioId: data['municipio_id']?.toString(),
-      email: data['email']?.toString() ?? email,
+      email: data['email']?.toString() ?? fallbackEmail,
     );
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString('auth_token', token);
     await preferences.setString('auth_role', role);
     await preferences.setString('auth_uid', uid);
-    await preferences.setString('auth_email', session!.email ?? email);
+    await preferences.setString('auth_email', session!.email ?? fallbackEmail);
     if (session!.municipioId != null) {
       await preferences.setString('auth_municipio', session!.municipioId!);
+    } else {
+      await preferences.remove('auth_municipio');
+    }
+    if (manualMunicipioSelection != null) {
+      await preferences.setBool(
+          'auth_municipio_manual', manualMunicipioSelection);
     }
     return session!;
   }
@@ -84,6 +115,7 @@ class AuthService {
     await preferences.remove('auth_uid');
     await preferences.remove('auth_email');
     await preferences.remove('auth_municipio');
+    await preferences.remove('auth_municipio_manual');
   }
 
   Future<AuthSession> updateMunicipio(String? municipioId) async {

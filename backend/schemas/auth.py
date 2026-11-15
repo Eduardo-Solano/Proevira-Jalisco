@@ -29,6 +29,12 @@ class UserProfileResponse(BaseModel):
     verificado: bool
 
 
+class RegisterPacienteRequest(BaseModel):
+    email: str
+    password: str
+    municipio_id: Optional[str] = None
+
+
 class RegisterMedicoRequest(BaseModel):
     email: str
     password: str

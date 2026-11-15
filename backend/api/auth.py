@@ -1,13 +1,15 @@
 import uuid
 import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from backend.db.database import get_db
-from backend.db.models import Usuario
+from backend.db.models import Municipio, Usuario
 from backend.schemas.auth import (
     LoginRequest,
     LoginResponse,
     UserProfileResponse,
+    RegisterPacienteRequest,
     RegisterMedicoRequest,
     RegisterMedicoResponse,
     VerifyMedicoResponse,
@@ -24,12 +26,33 @@ from backend.core.security import (
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
 
 
+def _build_login_response(user: Usuario) -> LoginResponse:
+    """Genera el JWT y la respuesta estándar de sesión para un usuario."""
+    token_data = {
+        "sub": user.uid,
+        "uid": user.uid,
+        "email": user.email,
+        "role": user.role,
+        "municipio_id": user.municipio_id,
+        "verificado": user.verificado,
+    }
+    access_token = create_access_token(token_data)
+    return LoginResponse(
+        token=access_token,
+        role=user.role,
+        uid=user.uid,
+        municipio_id=user.municipio_id,
+        email=user.email,
+    )
+
+
 @router.post("/login", response_model=LoginResponse)
 def login(request: LoginRequest, db: Session = Depends(get_db)):
     """
     Valida credenciales y genera un token JWT con el rol y municipio del usuario.
     """
-    user = db.query(Usuario).filter(Usuario.email == request.email).first()
+    normalized_email = request.email.strip().lower()
+    user = db.query(Usuario).filter(func.lower(Usuario.email) == normalized_email).first()
     if not user or not user.hashed_password or not verify_password(request.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -37,24 +60,7 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Crear token JWT
-    token_data = {
-        "sub": user.uid,
-        "uid": user.uid,
-        "email": user.email,
-        "role": user.role,
-        "municipio_id": user.municipio_id,
-        "verificado": user.verificado
-    }
-    access_token = create_access_token(token_data)
-
-    return LoginResponse(
-        token=access_token,
-        role=user.role,
-        uid=user.uid,
-        municipio_id=user.municipio_id,
-        email=user.email
-    )
+    return _build_login_response(user)
 
 
 @router.get("/me", response_model=UserProfileResponse)
@@ -117,6 +123,59 @@ def update_patient_profile(
         cedula=user.cedula,
         verificado=user.verificado
     )
+
+
+@router.post("/register-paciente", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
+def register_paciente(request: RegisterPacienteRequest, db: Session = Depends(get_db)):
+    """
+    Registro público de pacientes para la app móvil.
+    Crea la cuenta verificada con rol 'paciente' y devuelve la sesión JWT activa.
+    """
+    email = request.email.strip().lower()
+    if not email or "@" not in email or "." not in email.split("@", 1)[-1]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ingresa un correo electrónico válido",
+        )
+    if not request.password or len(request.password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña debe tener al menos 6 caracteres",
+        )
+
+    existing = db.query(Usuario).filter(func.lower(Usuario.email) == email).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El correo electrónico ya se encuentra registrado",
+        )
+
+    municipio_id = request.municipio_id.strip() if request.municipio_id else None
+    if municipio_id == "":
+        municipio_id = None
+    if municipio_id is not None:
+        muni = db.query(Municipio).filter(Municipio.id == municipio_id).first()
+        if not muni:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El municipio seleccionado no es válido",
+            )
+
+    uid = f"pac_{uuid.uuid4().hex[:12]}"
+    new_paciente = Usuario(
+        uid=uid,
+        email=email,
+        hashed_password=get_password_hash(request.password),
+        role="paciente",
+        municipio_id=municipio_id,
+        verificado=True,
+        created_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
+    )
+    db.add(new_paciente)
+    db.commit()
+    db.refresh(new_paciente)
+
+    return _build_login_response(new_paciente)
 
 
 @router.post("/register-medico", response_model=RegisterMedicoResponse)

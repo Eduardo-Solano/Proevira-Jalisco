@@ -194,6 +194,27 @@ class _ViralesAppState extends State<ViralesApp> with WidgetsBindingObserver {
     if (mounted) setState(() => session = current);
   }
 
+  Future<void> _register(
+      String email, String password, String? municipioId) async {
+    final current = await auth.registerPaciente(
+      email: email,
+      password: password,
+      municipioId: municipioId,
+    );
+    manualMunicipioSelected = municipioId != null && municipioId.isNotEmpty;
+    await sync.start();
+    socket.connect(current.token);
+    if (mounted) {
+      setState(() {
+        session = current;
+        if (manualMunicipioSelected) {
+          locationOutsideCoverage = false;
+          detectedMunicipioId = null;
+        }
+      });
+    }
+  }
+
   Future<void> _logout() async {
     socket.disconnect();
     await sync.dispose();
@@ -315,7 +336,7 @@ class _ViralesAppState extends State<ViralesApp> with WidgetsBindingObserver {
         home: loading
             ? const Scaffold(body: Center(child: CircularProgressIndicator()))
             : session == null
-                ? LoginScreen(onLogin: _login)
+                ? LoginScreen(onLogin: _login, onRegister: _register)
                 : HomePaciente(
                     api: api,
                     database: database,

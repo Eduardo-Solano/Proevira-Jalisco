@@ -348,6 +348,59 @@ class EndToEndApiTests(unittest.TestCase):
         self.assertEqual(datasets.status_code, 200)
         self.assertEqual(len(datasets.json()["imports"]), 1)
 
+    def test_07_paciente_registration_and_login(self):
+        email = f"Nuevo.Pac.{uuid.uuid4().hex[:6]}@jalisco.mx"
+        reg = self.client.post(
+            "/api/v1/auth/register-paciente",
+            json={
+                "email": f"  {email} ",
+                "password": "PacRegistro2026!",
+                "municipio_id": "14120",
+            },
+        )
+        self.assertEqual(reg.status_code, 201, reg.text)
+        data = reg.json()
+        self.assertEqual(data["role"], "paciente")
+        self.assertEqual(data["email"], email.lower())
+        self.assertEqual(data["municipio_id"], "14120")
+        self.assertTrue(data["token"])
+
+        me = self.client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {data['token']}"},
+        )
+        self.assertEqual(me.status_code, 200, me.text)
+        self.assertEqual(me.json()["role"], "paciente")
+        self.assertTrue(me.json()["verificado"])
+
+        # Login posterior con el mismo correo
+        logged = self._login(email.lower(), "PacRegistro2026!")
+        self.assertEqual(logged["uid"], data["uid"])
+
+        # Correo duplicado (insensible a mayúsculas)
+        dup = self.client.post(
+            "/api/v1/auth/register-paciente",
+            json={"email": email.lower(), "password": "PacRegistro2026!"},
+        )
+        self.assertEqual(dup.status_code, 400)
+
+        # Contraseña corta y municipio inválido
+        short_pwd = self.client.post(
+            "/api/v1/auth/register-paciente",
+            json={"email": "otro.pac@jalisco.mx", "password": "123"},
+        )
+        self.assertEqual(short_pwd.status_code, 400)
+
+        bad_muni = self.client.post(
+            "/api/v1/auth/register-paciente",
+            json={
+                "email": "otro.pac@jalisco.mx",
+                "password": "PacRegistro2026!",
+                "municipio_id": "99999",
+            },
+        )
+        self.assertEqual(bad_muni.status_code, 400)
+
 
 if __name__ == "__main__":
     unittest.main()
