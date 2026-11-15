@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
 import '../auth/auth_service.dart';
+import '../config.dart';
 
 class PerfilScreen extends StatefulWidget {
   const PerfilScreen({
@@ -26,22 +27,19 @@ class PerfilScreen extends StatefulWidget {
 }
 
 class _PerfilScreenState extends State<PerfilScreen> {
-  static const municipalities = <String, String>{
-    '14039': 'Guadalajara',
-    '14120': 'Zapopan',
-    '14098': 'Tlaquepaque',
-    '14101': 'Tonalá',
-    '14097': 'Tlajomulco',
-    '14070': 'El Salto',
-  };
-  late String? selectedMunicipio = widget.municipioId;
+  late String? selectedMunicipio = AppConfig.municipiosCentro.containsKey(widget.municipioId)
+      ? widget.municipioId
+      : null;
   bool saving = false;
 
   @override
   void didUpdateWidget(covariant PerfilScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!saving && oldWidget.municipioId != widget.municipioId) {
-      setState(() => selectedMunicipio = widget.municipioId);
+      setState(() => selectedMunicipio =
+          AppConfig.municipiosCentro.containsKey(widget.municipioId)
+              ? widget.municipioId
+              : null);
     }
   }
 
@@ -97,7 +95,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         value: null,
                         child: Text('Todo Jalisco'),
                       ),
-                      ...municipalities.entries.map(
+                      ...AppConfig.municipiosCentro.entries.map(
                         (entry) => DropdownMenuItem<String?>(
                           value: entry.key,
                           child: Text(entry.value),

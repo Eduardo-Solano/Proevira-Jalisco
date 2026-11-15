@@ -44,6 +44,23 @@ class ApiClient {
         authenticated: false,
       ));
 
+  Future<Map<String, dynamic>> registerPaciente({
+    required String email,
+    required String password,
+    String? municipioId,
+  }) async =>
+      _asMap(await _request(
+        'POST',
+        '/auth/register-paciente',
+        body: {
+          'email': email,
+          'password': password,
+          if (municipioId != null && municipioId.isNotEmpty)
+            'municipio_id': municipioId,
+        },
+        authenticated: false,
+      ));
+
   Future<Map<String, dynamic>> me() async =>
       _asMap(await _request('GET', '/auth/me'));
 
