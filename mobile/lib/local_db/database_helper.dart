@@ -203,4 +203,10 @@ class DatabaseHelper {
       );
     }).toList();
   }
+
+  Future<void> clearPatientData() async {
+    final db = await database;
+    await db.delete('pending_symptoms');
+    await db.delete('symptom_records');
+  }
 }

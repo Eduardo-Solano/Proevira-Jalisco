@@ -64,7 +64,8 @@ class ApiClient {
   Future<Map<String, dynamic>> me() async =>
       _asMap(await _request('GET', '/auth/me'));
 
-  Future<Map<String, dynamic>> updatePatientProfile(String? municipioId) async =>
+  Future<Map<String, dynamic>> updatePatientProfile(
+          String? municipioId) async =>
       _asMap(await _request(
         'PATCH',
         '/auth/me',

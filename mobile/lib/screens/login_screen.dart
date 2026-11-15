@@ -198,7 +198,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           items: [
                             const DropdownMenuItem<String?>(
                               value: null,
-                              child: Text('Detectar automáticamente / Todo Jalisco'),
+                              child: Text(
+                                  'Detectar automáticamente / Todo Jalisco'),
                             ),
                             ...AppConfig.municipiosCentro.entries.map(
                               (entry) => DropdownMenuItem<String?>(

@@ -188,6 +188,8 @@ class _ViralesAppState extends State<ViralesApp> with WidgetsBindingObserver {
   }
 
   Future<void> _login(String email, String password) async {
+    await database.clearPatientData();
+    await ReminderService.instance.clearSchedule();
     final current = await auth.login(email, password);
     await sync.start();
     socket.connect(current.token);
@@ -196,6 +198,8 @@ class _ViralesAppState extends State<ViralesApp> with WidgetsBindingObserver {
 
   Future<void> _register(
       String email, String password, String? municipioId) async {
+    await database.clearPatientData();
+    await ReminderService.instance.clearSchedule();
     final current = await auth.registerPaciente(
       email: email,
       password: password,
@@ -218,6 +222,8 @@ class _ViralesAppState extends State<ViralesApp> with WidgetsBindingObserver {
   Future<void> _logout() async {
     socket.disconnect();
     await sync.dispose();
+    await database.clearPatientData();
+    await ReminderService.instance.clearSchedule();
     await auth.logout();
     if (mounted) setState(() => session = null);
   }
