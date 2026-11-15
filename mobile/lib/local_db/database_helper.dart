@@ -98,6 +98,14 @@ class DatabaseHelper {
         .toList();
   }
 
+  Future<void> upsertAlert(Alerta alert) async {
+    await (await database).insert(
+      'alerts',
+      alert.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
   Future<void> replaceClues(List<Clue> clues) async {
     final db = await database;
     final batch = db.batch()..delete('clues');

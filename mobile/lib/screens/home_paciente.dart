@@ -21,6 +21,7 @@ class HomePaciente extends StatefulWidget {
     this.municipioId,
     required this.auth,
     required this.onMunicipioChanged,
+    required this.locationOutsideCoverage,
     required this.darkMode,
     required this.onDarkModeChanged,
     required this.sync,
@@ -34,6 +35,7 @@ class HomePaciente extends StatefulWidget {
   final String? municipioId;
   final AuthService auth;
   final ValueChanged<String?> onMunicipioChanged;
+  final bool locationOutsideCoverage;
   final bool darkMode;
   final ValueChanged<bool> onDarkModeChanged;
   final SyncService sync;
@@ -52,7 +54,8 @@ class _HomePacienteState extends State<HomePaciente> {
           api: widget.api,
           database: widget.database,
           socket: widget.socket,
-          municipioId: widget.municipioId),
+          municipioId: widget.municipioId,
+          locationOutsideCoverage: widget.locationOutsideCoverage),
       SeguimientoSintomas(api: widget.api, database: widget.database),
       MapaClues(api: widget.api, database: widget.database),
       const InformacionScreen(),
@@ -126,7 +129,8 @@ class _HomePacienteState extends State<HomePaciente> {
           NavigationDestination(icon: Icon(Icons.map_outlined), label: 'CLUES'),
           NavigationDestination(icon: Icon(Icons.info_outline), label: 'Guía'),
           NavigationDestination(icon: Icon(Icons.history), label: 'Historial'),
-          NavigationDestination(icon: Icon(Icons.person_outline), label: 'Perfil'),
+          NavigationDestination(
+              icon: Icon(Icons.person_outline), label: 'Perfil'),
         ],
       ),
     );

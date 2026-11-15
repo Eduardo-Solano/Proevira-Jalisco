@@ -14,7 +14,9 @@ class InformacionScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Consulta alertas epidemiológicas, registra tus síntomas y encuentra unidades médicas de Jalisco aunque estés fuera del estado.',
+            'Consulta alertas epidemiológicas, registra tus síntomas y '
+            'encuentra unidades médicas de Jalisco aunque estés fuera de la '
+            'Región Centro.',
           ),
           const SizedBox(height: 16),
           const _InfoCard(
@@ -67,8 +69,16 @@ class InformacionScreen extends StatelessWidget {
           FilledButton.icon(
             onPressed: () async {
               final uri = Uri(scheme: 'tel', path: '911');
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              final launched =
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+              if (!launched && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'No se encontró una aplicación telefónica en el dispositivo.',
+                    ),
+                  ),
+                );
               }
             },
             icon: const Icon(Icons.phone),

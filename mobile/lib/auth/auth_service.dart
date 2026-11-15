@@ -105,6 +105,12 @@ class AuthService {
     } else {
       await preferences.setString('auth_municipio', municipioId);
     }
+    await preferences.setBool('auth_municipio_manual', municipioId != null);
     return session!;
+  }
+
+  Future<bool> hasManualMunicipioSelection() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getBool('auth_municipio_manual') ?? false;
   }
 }

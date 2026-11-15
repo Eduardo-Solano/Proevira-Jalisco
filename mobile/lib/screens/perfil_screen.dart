@@ -30,12 +30,20 @@ class _PerfilScreenState extends State<PerfilScreen> {
     '14039': 'Guadalajara',
     '14120': 'Zapopan',
     '14098': 'Tlaquepaque',
-    '10101': 'Tonalá',
+    '14101': 'Tonalá',
     '14097': 'Tlajomulco',
     '14070': 'El Salto',
   };
   late String? selectedMunicipio = widget.municipioId;
   bool saving = false;
+
+  @override
+  void didUpdateWidget(covariant PerfilScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!saving && oldWidget.municipioId != widget.municipioId) {
+      setState(() => selectedMunicipio = widget.municipioId);
+    }
+  }
 
   Future<void> save() async {
     setState(() => saving = true);
@@ -114,7 +122,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
           Card(
             child: SwitchListTile(
               title: const Text('Modo oscuro'),
-              subtitle: const Text('Reduce el brillo y mejora la lectura nocturna'),
+              subtitle:
+                  const Text('Reduce el brillo y mejora la lectura nocturna'),
               value: widget.darkMode,
               onChanged: widget.onDarkModeChanged,
             ),
@@ -123,7 +132,8 @@ class _PerfilScreenState extends State<PerfilScreen> {
             child: ListTile(
               leading: Icon(Icons.accessibility_new),
               title: Text('Contraste mejorado'),
-              subtitle: Text('La aplicación usa colores y textos de alto contraste.'),
+              subtitle:
+                  Text('La aplicación usa colores y textos de alto contraste.'),
             ),
           ),
         ],
