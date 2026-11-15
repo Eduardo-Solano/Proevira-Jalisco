@@ -35,6 +35,18 @@ class WebViewsSmokeTests(unittest.TestCase):
                 at.sidebar.radio[0].set_value(seccion).run()
                 self.assertEqual(len(at.exception), 0, f"Excepción en {seccion}: {at.exception}")
 
+    def test_admin_view_renders_cleanly_for_funcionario(self):
+        at = AppTest.from_file(WEB_APP_PATH, default_timeout=20)
+        at.session_state["auth_token"] = "dummy-token"
+        at.session_state["user_email"] = "admin@proevira.jalisco.gob.mx"
+        at.session_state["user_role"] = "funcionario"
+        at.session_state["user_uid"] = "usr_funcionario_001"
+        at.run()
+        self.assertEqual(len(at.exception), 0, f"Excepción inicial admin: {at.exception}")
+
+        at.sidebar.radio[0].set_value("⛭   Administración").run()
+        self.assertEqual(len(at.exception), 0, f"Excepción en Administración: {at.exception}")
+
 
 if __name__ == "__main__":
     unittest.main()

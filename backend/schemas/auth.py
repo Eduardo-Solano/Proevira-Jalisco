@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
 
@@ -57,3 +58,33 @@ class VerifyMedicoResponse(BaseModel):
     role: str
     verificado: bool
     mensaje: str
+
+
+class AdminUserResponse(BaseModel):
+    uid: str
+    email: str
+    role: str
+    municipio_id: Optional[str] = None
+    institucion: Optional[str] = None
+    cedula: Optional[str] = None
+    verificado: bool
+    created_at: Optional[datetime] = None
+
+
+class AdminUserCreateRequest(BaseModel):
+    email: str
+    password: str
+    role: str = "medico"
+    municipio_id: Optional[str] = None
+    institucion: Optional[str] = None
+    cedula: Optional[str] = None
+    verificado: bool = True
+
+
+class AdminUserUpdateRequest(BaseModel):
+    role: Optional[str] = None
+    municipio_id: Optional[str] = None
+    institucion: Optional[str] = None
+    cedula: Optional[str] = None
+    verificado: Optional[bool] = None
+    clear_municipio: bool = False

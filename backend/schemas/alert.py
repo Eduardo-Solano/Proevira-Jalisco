@@ -34,6 +34,8 @@ class AlertCreateResponse(BaseModel):
 
 class PredictiveAlertDraftReviewRequest(BaseModel):
     decision: str
+    nivel: Optional[str] = None
+    mensaje: Optional[str] = None
 
 
 class PredictiveAlertDraftResponse(BaseModel):

@@ -15,6 +15,7 @@ from views.predicciones import render_predicciones_view
 from views.alertas import render_alertas_view
 from views.datos import render_datos_view
 from views.reportes import render_reportes_view
+from views.admin import render_admin_view
 from auth_ui import render_auth_page
 from api_client import DEMO_MODE, ApiError
 
@@ -680,7 +681,8 @@ header[data-testid="stHeader"] [data-testid="stToolbar"]::after {{
 </style>
 """, unsafe_allow_html=True)
 
-NAV = [
+ADMIN_SECTION = "⛭   Administración"
+NAV_BASE = [
     "◫   Panorama",
     "⌖   Mapa epidemiológico",
     "↗   Predicciones",
@@ -688,6 +690,8 @@ NAV = [
     "▧   Reportes",
     "▲   Alertas",
 ]
+_USER_ROLE = (st.session_state.get("user_role") or "").strip().lower()
+NAV = NAV_BASE + ([ADMIN_SECTION] if DEMO_MODE or _USER_ROLE in {"funcionario", "admin", "administrador"} else [])
 
 if DEMO_MODE and st.session_state.get("demo_exit"):
     st.markdown("""
@@ -754,6 +758,8 @@ else:
             render_reportes_view()
         elif seccion == NAV[5]:
             render_alertas_view()
+        elif seccion == ADMIN_SECTION:
+            render_admin_view()
     except ApiError as error:
         st.error(f"No se pudo consultar la información del backend. {error}")
 
