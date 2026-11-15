@@ -18,6 +18,7 @@ class AlertasScreen extends StatefulWidget {
     required this.database,
     required this.socket,
     this.municipioId,
+    required this.locationOutsideCoverage,
     super.key,
   });
 
@@ -25,6 +26,7 @@ class AlertasScreen extends StatefulWidget {
   final DatabaseHelper database;
   final AlertsSocket socket;
   final String? municipioId;
+  final bool locationOutsideCoverage;
 
   @override
   State<AlertasScreen> createState() => _AlertasScreenState();
@@ -56,7 +58,13 @@ class _AlertasScreenState extends State<AlertasScreen> {
     widget.socket.events.listen((json) {
       final alert = Alerta.fromJson(json);
       if (mounted && belongsToPatient(alert)) {
-        setState(() => alerts = [alert, ...alerts]);
+        setState(() {
+          alerts = [
+            alert,
+            ...alerts.where((item) => item.id != alert.id),
+          ];
+        });
+        widget.database.upsertAlert(alert);
         ReminderService.instance.showAlertNotification(
           title: 'Nueva alerta epidemiológica',
           body: '${alert.municipio}: ${alert.mensaje}',
@@ -75,8 +83,7 @@ class _AlertasScreenState extends State<AlertasScreen> {
 
   Future<void> load() async {
     try {
-      final remote =
-          await widget.api.getAlerts(municipio: widget.municipioId);
+      final remote = await widget.api.getAlerts(municipio: widget.municipioId);
       await widget.database.replaceAlerts(remote);
       if (mounted) setState(() => alerts = remote);
     } catch (exception) {
@@ -87,7 +94,6 @@ class _AlertasScreenState extends State<AlertasScreen> {
           error = 'Mostrando datos guardados sin conexión.';
         });
       }
-
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -265,11 +271,9 @@ class _AlertasScreenState extends State<AlertasScreen> {
                         initialValue: incidenceWeeks,
                         isDense: true,
                         isExpanded: true,
-                        decoration:
-                            const InputDecoration(labelText: 'Periodo'),
+                        decoration: const InputDecoration(labelText: 'Periodo'),
                         items: const [
-                          DropdownMenuItem(
-                              value: 4, child: Text('Último mes')),
+                          DropdownMenuItem(value: 4, child: Text('Último mes')),
                           DropdownMenuItem(
                               value: 8, child: Text('Últimos 2 meses')),
                         ],
@@ -345,25 +349,25 @@ class _AlertasScreenState extends State<AlertasScreen> {
                                     child: GestureDetector(
                                       onTap: () => showIncidenceDetail(point),
                                       child: Tooltip(
-                                      message:
-                                          '${point.nombre}\n${point.casos} casos',
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: incidenceColor(
-                                                  point, maxCases)
-                                              .withValues(alpha: .85),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                              color: Colors.white, width: 2),
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Text(
-                                          '${point.casos}',
-                                          style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 11),
-                                        ),
+                                        message:
+                                            '${point.nombre}\n${point.casos} casos',
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color:
+                                                incidenceColor(point, maxCases)
+                                                    .withValues(alpha: .85),
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                                color: Colors.white, width: 2),
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            '${point.casos}',
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 11),
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -410,6 +414,19 @@ class _AlertasScreenState extends State<AlertasScreen> {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 12),
+            if (widget.locationOutsideCoverage)
+              Card(
+                color: Theme.of(context).colorScheme.errorContainer,
+                child: const ListTile(
+                  leading: Icon(Icons.location_off_outlined),
+                  title: Text('Ubicación fuera de cobertura'),
+                  subtitle: Text(
+                    'Las funciones basadas en tu ubicación actual están '
+                    'fuera del alcance de la Región Centro. Ve a Mi perfil '
+                    'para seleccionar manualmente un municipio.',
+                  ),
+                ),
+              ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               color: online
@@ -514,7 +531,9 @@ class _AlertasScreenState extends State<AlertasScreen> {
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(child: Text('No hay alertas activas.')),
               ),
-            ...alerts.where((alert) => belongsToPatient(alert) && matches(alert)).map(
+            ...alerts
+                .where((alert) => belongsToPatient(alert) && matches(alert))
+                .map(
                   (alert) => Card(
                     clipBehavior: Clip.antiAlias,
                     child: ExpansionTile(

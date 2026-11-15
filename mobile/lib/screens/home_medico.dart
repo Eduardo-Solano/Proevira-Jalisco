@@ -133,7 +133,10 @@ class _HomeMedicoState extends State<HomeMedico> {
     final pages = [
       dashboard(),
       AlertasScreen(
-          api: widget.api, database: widget.database, socket: widget.socket),
+          api: widget.api,
+          database: widget.database,
+          socket: widget.socket,
+          locationOutsideCoverage: false),
       MapaClues(api: widget.api, database: widget.database),
     ];
     const titles = ['Panel médico', 'Alertas', 'CLUES'];

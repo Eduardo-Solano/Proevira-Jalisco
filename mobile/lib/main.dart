@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import 'api/api_client.dart';
 import 'api/ws_client.dart';
 import 'auth/auth_service.dart';
 import 'local_db/database_helper.dart';
 import 'local_db/sync_service.dart';
+import 'services/reminder_service.dart';
 import 'screens/home_paciente.dart';
 import 'screens/login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,7 +20,7 @@ class ViralesApp extends StatefulWidget {
   State<ViralesApp> createState() => _ViralesAppState();
 }
 
-class _ViralesAppState extends State<ViralesApp> {
+class _ViralesAppState extends State<ViralesApp> with WidgetsBindingObserver {
   final api = ApiClient();
   final database = DatabaseHelper.instance;
   late final AuthService auth;
@@ -27,10 +29,17 @@ class _ViralesAppState extends State<ViralesApp> {
   AuthSession? session;
   bool loading = true;
   ThemeMode themeMode = ThemeMode.light;
+  bool locationOutsideCoverage = false;
+  bool locationChecked = false;
+  bool locationValid = false;
+  bool _coverageNoticeShown = false;
+  bool manualMunicipioSelected = false;
+  String? detectedMunicipioId;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     auth = AuthService(api);
     sync = SyncService(api, database);
     socket = AlertsSocket();
@@ -48,6 +57,9 @@ class _ViralesAppState extends State<ViralesApp> {
   Future<void> _restore() async {
     final restored = await auth.restore();
     if (restored != null) {
+      manualMunicipioSelected = await auth.hasManualMunicipioSelection();
+    }
+    if (restored != null) {
       await sync.start();
       socket.connect(restored.token);
     }
@@ -56,7 +68,123 @@ class _ViralesAppState extends State<ViralesApp> {
         session = restored;
         loading = false;
       });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _initializeStartupServices();
+      });
     }
+  }
+
+  Future<void> _initializeStartupServices() async {
+    await ReminderService.instance.initialize();
+    await _checkInitialLocation();
+    _showCoverageNoticeIfNeeded();
+  }
+
+  Future<void> _checkInitialLocation() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition().timeout(
+        const Duration(seconds: 10),
+      );
+      if (mounted) {
+        final inRegion = _isInRegionCentro(
+          position.latitude,
+          position.longitude,
+        );
+        setState(() {
+          locationValid = true;
+          locationOutsideCoverage = !inRegion && !manualMunicipioSelected;
+          detectedMunicipioId = inRegion
+              ? _nearestMunicipio(position.latitude, position.longitude)
+              : null;
+          locationChecked = true;
+        });
+      }
+    } catch (_) {
+      // Location is optional; the profile selector remains available.
+    } finally {
+      if (mounted && !locationChecked) {
+        setState(() => locationChecked = true);
+      }
+    }
+  }
+
+  bool _isInRegionCentro(double latitude, double longitude) {
+    return latitude >= 20.25 &&
+        latitude <= 21.15 &&
+        longitude >= -103.80 &&
+        longitude <= -102.90;
+  }
+
+  String _nearestMunicipio(double latitude, double longitude) {
+    const municipalities = <String, List<double>>{
+      '14039': [20.676470, -103.347811],
+      '14120': [20.716405, -103.416947],
+      '14098': [20.610214, -103.320670],
+      '14101': [20.630600, -103.251448],
+      '14097': [20.521658, -103.432591],
+      '14070': [20.542290, -103.282728],
+      '14124': [20.622212, -103.068761],
+      '14044': [20.385805, -103.191998],
+      '14045': [20.863757, -103.210450],
+      '14051': [20.507934, -103.167543],
+      '14029': [20.930300, -103.028588],
+      '14071': [21.046300, -103.427390],
+    };
+    var closest = municipalities.keys.first;
+    var distance = double.infinity;
+    for (final entry in municipalities.entries) {
+      final latDistance = latitude - entry.value[0];
+      final lonDistance = longitude - entry.value[1];
+      final squaredDistance =
+          latDistance * latDistance + lonDistance * lonDistance;
+      if (squaredDistance < distance) {
+        distance = squaredDistance;
+        closest = entry.key;
+      }
+    }
+    return closest;
+  }
+
+  void _showCoverageNoticeIfNeeded() {
+    if (!locationChecked ||
+        !locationOutsideCoverage ||
+        _coverageNoticeShown ||
+        !mounted) {
+      return;
+    }
+    _coverageNoticeShown = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Ubicación fuera de cobertura'),
+          content: const Text(
+            'Por el momento, las funciones basadas en tu ubicación actual '
+            'están fuera del alcance de la Región Centro de Jalisco. '
+            'En el apartado Mi perfil puedes seleccionar manualmente un '
+            'municipio para consultar sus alertas y unidades médicas.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   Future<void> _login(String email, String password) async {
@@ -76,19 +204,44 @@ class _ViralesAppState extends State<ViralesApp> {
   Future<void> _setDarkMode(bool enabled) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool('dark_mode', enabled);
-    if (mounted) setState(() => themeMode = enabled ? ThemeMode.dark : ThemeMode.light);
+    if (mounted) {
+      setState(() => themeMode = enabled ? ThemeMode.dark : ThemeMode.light);
+    }
   }
 
   void _setMunicipio(String? municipioId) {
-    if (mounted) setState(() => session = auth.session);
+    if (mounted) {
+      setState(() {
+        session = auth.session;
+        manualMunicipioSelected = municipioId != null;
+        if (municipioId != null) {
+          locationOutsideCoverage = false;
+          detectedMunicipioId = null;
+        }
+      });
+    }
+  }
+
+  String? get activeMunicipioId {
+    if (manualMunicipioSelected) return session?.municipioId;
+    if (!locationValid || locationOutsideCoverage) return null;
+    return detectedMunicipioId ?? session?.municipioId;
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     socket.dispose();
     sync.dispose();
     api.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && session != null) {
+      socket.connect(session!.token);
+    }
   }
 
   @override
@@ -168,9 +321,10 @@ class _ViralesAppState extends State<ViralesApp> {
                     database: database,
                     socket: socket,
                     onLogout: _logout,
-                    municipioId: session?.municipioId,
+                    municipioId: activeMunicipioId,
                     auth: auth,
                     onMunicipioChanged: _setMunicipio,
+                    locationOutsideCoverage: locationOutsideCoverage,
                     darkMode: themeMode == ThemeMode.dark,
                     onDarkModeChanged: _setDarkMode,
                     sync: sync,
