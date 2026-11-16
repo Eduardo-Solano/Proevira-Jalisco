@@ -2,118 +2,106 @@
 Módulo de interfaz de autenticación con identidad oficial del Gobierno de Jalisco.
 """
 
+import base64
+from pathlib import Path
+
 import streamlit as st
 from api_client import api
 
+def _logo(filename: str) -> str:
+    image = (Path(__file__).parent / "assets" / filename).read_bytes()
+    return "data:image/png;base64," + base64.b64encode(image).decode("ascii")
+
+
 def render_auth_page():
     """Renderiza el portal de acceso institucional con diseño oficial de Jalisco."""
-    
+
     st.markdown("""
-        <style>
-        .jal-top-bar {
-            background-color: #082142;
-            color: #ffffff;
-            font-size: 0.75rem;
-            padding: 6px 16px;
-            font-weight: 600;
-            letter-spacing: 1px;
-            border-bottom: 3px solid #EAA824; /* Oro Jalisco */
-            margin-bottom: 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .jal-card {
-            background: #ffffff;
-            border-radius: 8px;
-            padding: 2.2rem 2rem;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 4px 16px rgba(0, 40, 85, 0.08);
-            border-top: 4px solid #003366; /* Azul Jalisco */
-        }
-        .jal-title {
-            color: #003366;
-            font-size: 1.6rem;
-            font-weight: 800;
-            margin: 0.2rem 0;
-            letter-spacing: -0.5px;
-        }
-        .jal-gold-badge {
-            display: inline-block;
-            background-color: #fff8e6;
-            color: #b47504;
-            border: 1px solid #fed7aa;
-            font-size: 0.72rem;
-            font-weight: 700;
-            padding: 3px 10px;
-            border-radius: 4px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        </style>
-        <div class="jal-top-bar">
-            <span>GOBIERNO DEL ESTADO DE JALISCO • SECRETARÍA DE SALUD</span>
-            <span>PORTAL OFICIAL</span>
-        </div>
+<style>
+header[data-testid="stHeader"], section[data-testid="stSidebar"] { display: none !important; }
+.stApp, [data-testid="stAppViewContainer"] {
+    background:
+        radial-gradient(ellipse at 10% 10%, rgba(116, 55, 139, .09), transparent 50%),
+        radial-gradient(ellipse at 95% 85%, rgba(164, 139, 184, .12), transparent 50%),
+        #f7f6f9 !important;
+}
+[data-testid="stMainBlockContainer"] {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 520px !important;
+    margin-inline: auto;
+    padding: clamp(1.5rem, 5vh, 4rem) 1rem 2rem !important;
+}
+.st-key-auth_card {
+    background: #fff; border: 1px solid #e9e5ed; border-radius: 24px;
+    padding: clamp(1.25rem, 5vw, 2rem); box-shadow: 0 12px 45px rgba(48, 24, 62, .05);
+    box-sizing: border-box; min-width: 0;
+}
+.auth-identity { text-align: center; margin-bottom: 1.7rem; }
+.auth-identity img { width: 190px; max-width: 75%; height: auto; }
+.auth-identity p { color: #716979; font-size: .88rem; margin: .7rem 0 0; }
+.st-key-auth_card h3 { color: #302537; font-size: 1.45rem; letter-spacing: -.035em; }
+.st-key-auth_card [data-testid="stCaptionContainer"] { color: #797180; }
+.st-key-auth_card [data-testid="stForm"] { border: 0; padding: .4rem 0 0; }
+.st-key-auth_card [data-testid="stTextInput"] label { color: #493e50; font-size: .85rem; }
+.st-key-auth_card [data-baseweb="input"] { background: #fcfbfd; border-radius: 10px; border-color: #e3dfe7; }
+.st-key-auth_card [data-baseweb="input"]:focus-within { border-color: #79388b; }
+.st-key-auth_card input { min-height: 44px; color: #302537; font-size: 16px; }
+.st-key-auth_card [data-testid="stFormSubmitButton"] button {
+    background: #652379; color: #fff; border: 1px solid #652379;
+    min-height: 46px; border-radius: 10px; margin-top: .5rem; font-weight: 600;
+}
+.st-key-auth_card [data-testid="stFormSubmitButton"] button:hover { background: #511a63; border-color: #511a63; color: #fff; }
+.st-key-auth_card button:focus-visible { outline: 3px solid #cba9d6; outline-offset: 3px; }
+.auth-institution { border-top: 1px solid #eeeaf1; margin-top: 1.8rem; padding-top: 1.35rem; text-align: center; }
+.auth-institution img { width: 145px; max-width: 60%; height: auto; }
+.auth-institution p { color: #797180; font-size: .75rem; margin: .4rem 0 0; }
+.auth-footnote { text-align: center; color: #716979; font-size: .75rem; margin: 1rem 0; line-height: 1.7; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+    .st-key-auth_card { padding: 1.5rem 1.15rem 1.25rem; border-radius: 18px; }
+    .auth-identity img { width: 160px; }
+}
+@media (max-height: 740px) {
+    [data-testid="stMainBlockContainer"] { padding-top: 1rem !important; }
+    .auth-identity { margin-bottom: 1rem; }
+    .auth-institution { margin-top: 1rem; padding-top: 1rem; }
+}
+</style>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 1.8, 1])
-    
-    with col2:
-        st.markdown("""
-            <div style="text-align: center; margin-bottom: 1.5rem;">
-                <span class="jal-gold-badge">Sistema Estatal de Salud</span>
-                <div class="jal-title">VIRALES JALISCO</div>
-                <p style="color: #64748b; font-size: 0.88rem; margin-top: 4px;">
-                    Plataforma de Vigilancia Epidemiológica y Alerta Temprana<br>
-                    <strong>Dengue • Influenza • COVID-19</strong>
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        tab_login, tab_registro = st.tabs(["🔐 Acceso al Portal", "📝 Registro de Médico"])
-        
-        with tab_login:
-            st.markdown("##### Iniciar Sesión")
-            with st.form("form_login"):
-                email = st.text_input("Correo Institucional", placeholder="usuario@saludjalisco.gob.mx")
-                password = st.text_input("Contraseña", type="password")
-                btn_submit = st.form_submit_button("Ingresar al Sistema", use_container_width=True)
-                
-                if btn_submit:
-                    if not email or not password:
-                        st.warning("Por favor completa tu correo y contraseña.")
-                    else:
-                        result = api.login(email, password)
-                        if result["success"]:
-                            st.success(f"Bienvenido. Rol asignado: {st.session_state.get('user_role', '').capitalize()}")
-                            st.rerun()
-                        else:
-                            st.error(result.get("error", "Error de autenticación"))
-            
-        with tab_registro:
-            st.markdown("##### Solicitud de Alta de Personal Médico")
-            st.caption("El acceso médico requiere verificación posterior de su cédula profesional ante el registro estatal.")
-            with st.form("form_registro_medico"):
-                reg_email = st.text_input("Correo Electrónico", placeholder="medico@hospital.org")
-                reg_pass = st.text_input("Contraseña", type="password")
-                reg_inst = st.text_input("Unidad de Salud (CLUES)", placeholder="Ej. Centro de Salud Guadalajara 1")
-                reg_cedula = st.text_input("Cédula Profesional", placeholder="Ej. 12345678")
-                btn_reg = st.form_submit_button("Enviar Solicitud de Registro", use_container_width=True)
-                
-                if btn_reg:
-                    if not reg_email or not reg_pass or not reg_cedula:
-                        st.warning("Completa los datos obligatorios.")
-                    else:
-                        res = api.register_medico(reg_email, reg_pass, reg_inst, reg_cedula)
-                        if res["success"]:
-                            st.info("✅ Registro enviado. Su cuenta iniciará con estatus `verificado: false`.")
-                        else:
-                            st.error(res.get("error", "No se pudo procesar la solicitud."))
+    with st.container(key="auth_card"):
+        st.markdown(
+            f'<div class="auth-identity"><img src="{_logo("Virales.png")}" alt="VIRALES">'
+            '<p>Vigilancia epidemiológica · Jalisco</p></div>',
+            unsafe_allow_html=True,
+        )
 
-        st.markdown("""
-            <div style="text-align: center; margin-top: 2rem; font-size: 0.75rem; color: #94a3b8;">
-                Conforme a la <strong>LFPDPPP</strong> y <strong>NOM-017-SSA2-2012</strong>.<br>
-                Gobierno del Estado de Jalisco | Secretaría de Salud.
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown("### Bienvenido de nuevo")
+        st.caption("Ingresa con tu cuenta para acceder al panel.")
+        with st.form("form_login"):
+            email = st.text_input("Correo electrónico", placeholder="nombre@institucion.gob.mx")
+            password = st.text_input("Contraseña", type="password")
+            btn_submit = st.form_submit_button("Iniciar sesión", use_container_width=True)
+
+            if btn_submit:
+                if not email.strip() or not password:
+                    st.warning("Por favor completa tu correo y contraseña.")
+                else:
+                    with st.spinner("Iniciando sesión…"):
+                        result = api.login(email.strip(), password)
+                    if result["success"]:
+                        st.rerun()
+                    else:
+                        st.error(result.get("error", "No se pudo iniciar sesión. Intenta de nuevo."))
+
+        st.markdown(
+            f'<div class="auth-institution"><img src="{_logo("jalisco.png")}" alt="Jalisco, Gobierno del Estado">'
+            '<p>Secretaría de Salud</p></div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        '<p class="auth-footnote">Plataforma de vigilancia de dengue, influenza y COVID-19.<br>'
+        'LFPDPPP · NOM-017-SSA2-2012</p>',
+        unsafe_allow_html=True,
+    )

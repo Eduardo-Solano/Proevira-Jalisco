@@ -605,82 +605,83 @@ div[data-testid="stSlider"] label { color: #526861; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown(f"""
-<style>
-header[data-testid="stHeader"] {{
-    height: 82px !important;
-    min-height: 82px;
-    z-index: 1000;
-    background: #fff;
-}}
-header[data-testid="stHeader"] [data-testid="stToolbar"] {{
-    box-sizing: border-box;
-    min-height: 82px;
-    padding: .7rem 1rem;
-    border-bottom: 1px solid #dfe3e8;
-    background: #fff;
-    display: flex;
-    align-items: center;
-}}
-header[data-testid="stHeader"] [data-testid="stToolbar"] > div {{
-    position: absolute;
-    inset: 0;
-    display: block !important;
-    pointer-events: none;
-}}
-header[data-testid="stHeader"] [data-testid="stToolbarActions"],
-header[data-testid="stHeader"] [data-testid="stStatusWidget"],
-header[data-testid="stHeader"] [data-testid="stAppDeployButton"],
-header[data-testid="stHeader"] [data-testid="stMainMenu"] {{
-    display: none !important;
-}}
-header[data-testid="stHeader"] [data-testid="stExpandSidebarButton"] {{
-    position: absolute;
-    top: 27px;
-    left: 8px;
-    z-index: 1002;
-    pointer-events: auto;
-}}
-header[data-testid="stHeader"]:has([data-testid="stExpandSidebarButton"])
-    [data-testid="stToolbar"]::before {{
-    margin-left: 40px;
-}}
-header[data-testid="stHeader"] [data-testid="stToolbar"]::before {{
-    content: "VIRALES · Vigilancia epidemiológica\\A Dengue · Influenza · COVID-19";
-    white-space: pre-line;
-    color: #454545;
-    font: 700 1.08rem/1.35 "Segoe UI", "Aptos", sans-serif;
-}}
-header[data-testid="stHeader"] [data-testid="stToolbar"]::after {{
-    content: "";
-    display: block;
-    flex: 0 0 190px;
-    height: 64px;
-    margin-left: auto;
-    margin-right: 14px;
-    background: url("data:image/png;base64,{LOGO_BASE64}") no-repeat right center / contain;
-}}
-@media (max-width: 760px) {{
+if DEMO_MODE or st.session_state.get("auth_token"):
+    st.markdown(f"""
+    <style>
     header[data-testid="stHeader"] {{
-        height: 70px !important;
-        min-height: 70px;
-    }}
-    header[data-testid="stHeader"] [data-testid="stToolbar"] {{
-        min-height: 70px;
-        padding: .55rem .75rem;
+        height: 82px !important;
+        min-height: 82px;
+        z-index: 1000;
         background: #fff;
     }}
+    header[data-testid="stHeader"] [data-testid="stToolbar"] {{
+        box-sizing: border-box;
+        min-height: 82px;
+        padding: .7rem 1rem;
+        border-bottom: 1px solid #dfe3e8;
+        background: #fff;
+        display: flex;
+        align-items: center;
+    }}
+    header[data-testid="stHeader"] [data-testid="stToolbar"] > div {{
+        position: absolute;
+        inset: 0;
+        display: block !important;
+        pointer-events: none;
+    }}
+    header[data-testid="stHeader"] [data-testid="stToolbarActions"],
+    header[data-testid="stHeader"] [data-testid="stStatusWidget"],
+    header[data-testid="stHeader"] [data-testid="stAppDeployButton"],
+    header[data-testid="stHeader"] [data-testid="stMainMenu"] {{
+        display: none !important;
+    }}
+    header[data-testid="stHeader"] [data-testid="stExpandSidebarButton"] {{
+        position: absolute;
+        top: 27px;
+        left: 8px;
+        z-index: 1002;
+        pointer-events: auto;
+    }}
+    header[data-testid="stHeader"]:has([data-testid="stExpandSidebarButton"])
+        [data-testid="stToolbar"]::before {{
+        margin-left: 40px;
+    }}
     header[data-testid="stHeader"] [data-testid="stToolbar"]::before {{
-        font-size: .88rem;
+        content: "VIRALES · Vigilancia epidemiológica\\A Dengue · Influenza · COVID-19";
+        white-space: pre-line;
+        color: #454545;
+        font: 700 1.08rem/1.35 "Segoe UI", "Aptos", sans-serif;
     }}
     header[data-testid="stHeader"] [data-testid="stToolbar"]::after {{
-        flex-basis: 126px;
-        height: 42px;
-        margin-right: 8px;
+        content: "";
+        display: block;
+        flex: 0 0 190px;
+        height: 64px;
+        margin-left: auto;
+        margin-right: 14px;
+        background: url("data:image/png;base64,{LOGO_BASE64}") no-repeat right center / contain;
     }}
-}}
-</style>
-""", unsafe_allow_html=True)
+    @media (max-width: 760px) {{
+        header[data-testid="stHeader"] {{
+            height: 70px !important;
+            min-height: 70px;
+        }}
+        header[data-testid="stHeader"] [data-testid="stToolbar"] {{
+            min-height: 70px;
+            padding: .55rem .75rem;
+            background: #fff;
+        }}
+        header[data-testid="stHeader"] [data-testid="stToolbar"]::before {{
+            font-size: .88rem;
+        }}
+        header[data-testid="stHeader"] [data-testid="stToolbar"]::after {{
+            flex-basis: 126px;
+            height: 42px;
+            margin-right: 8px;
+        }}
+    }}
+    </style>
+    """, unsafe_allow_html=True)
 
 ADMIN_SECTION = "⛭   Administración"
 NAV_BASE = [
