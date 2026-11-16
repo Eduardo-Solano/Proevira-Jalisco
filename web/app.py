@@ -18,6 +18,7 @@ from views.reportes import render_reportes_view
 from views.admin import render_admin_view
 from auth_ui import render_auth_page
 from api_client import DEMO_MODE, ApiError
+from connection_ui import render_connection_status
 
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "jalisco.png")
 with open(LOGO_PATH, "rb") as logo_file:
@@ -744,6 +745,10 @@ else:
                 if st.button("Cerrar sesión", use_container_width=True):
                     _salir_del_panel()
                     st.rerun()
+
+    render_connection_status()
+    if not DEMO_MODE and st.session_state.get("backend_offline"):
+        st.stop()
 
     try:
         if seccion == NAV[0]:

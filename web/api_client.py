@@ -88,12 +88,14 @@ class ApiClient:
         json: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, str]] = None,
         root_path: bool = False,
+        use_cache: bool = True,
+        timeout: Any = REQUEST_TIMEOUT,
     ) -> Any:
         method_upper = method.upper()
         cache = None
         cache_key = None
         cache_ttl = 45
-        if method_upper == "GET":
+        if method_upper == "GET" and use_cache:
             cache = st.session_state.setdefault("_api_read_cache", {})
             params_key = tuple(sorted((str(key), str(value)) for key, value in (params or {}).items()))
             token = st.session_state.get("auth_token", "")
@@ -116,7 +118,7 @@ class ApiClient:
                 params=params,
                 json=json,
                 headers=headers or self._get_headers(),
-                timeout=REQUEST_TIMEOUT,
+                timeout=timeout,
             )
         except requests.RequestException as error:
             raise ApiError(_connection_error_message(error)) from error
@@ -146,10 +148,10 @@ class ApiClient:
         if DEMO_MODE:
             return False
         try:
-            health = self._request("GET", "/health", root_path=True)
+            health = self._request("GET", "/health", root_path=True, use_cache=False, timeout=(3.0, 5.0))
         except ApiError:
             return False
-        return health.get("status") == "ok"
+        return isinstance(health, dict) and health.get("status") == "ok"
 
     def get_system_health(self) -> Dict[str, Any]:
         if DEMO_MODE:

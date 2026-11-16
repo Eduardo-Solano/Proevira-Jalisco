@@ -79,6 +79,22 @@ class WebErrorTests(unittest.TestCase):
             self.assertEqual(self.client.get_datasets(), {"datasets": []})
         request.assert_called_once()
 
+    def test_health_bypasses_cache_and_detects_recovery(self):
+        response = Mock(ok=True, status_code=200, content=b"{}")
+        response.json.return_value = {"status": "ok"}
+        with patch.object(api_client.requests, "request", side_effect=[
+            response, requests.ConnectionError("offline"), response,
+        ]) as request:
+            self.assertTrue(self.client.check_health())
+            self.assertFalse(self.client.check_health())
+            self.assertTrue(self.client.check_health())
+        self.assertEqual(request.call_count, 3)
+        self.assertEqual(request.call_args.kwargs["timeout"], (3.0, 5.0))
+
+    def test_health_rejects_invalid_payload(self):
+        with patch.object(self.client, "_request", return_value=None):
+            self.assertFalse(self.client.check_health())
+
 
 if __name__ == "__main__":
     unittest.main()
