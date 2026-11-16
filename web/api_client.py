@@ -36,6 +36,29 @@ class ApiError(RuntimeError):
     """Error explícito al solicitar o interpretar una respuesta del backend."""
 
 
+def _http_error_message(status_code: int, path: str) -> str:
+    """Traduce errores del servicio sin exponer su respuesta ni datos internos."""
+    if status_code == 401:
+        if path == "/auth/login":
+            return "El correo o la contraseña son incorrectos. Revisa tus datos e intenta de nuevo."
+        return "Tu sesión venció o ya no es válida. Cierra sesión e inicia sesión nuevamente."
+    return {
+        400: "No se pudo procesar la solicitud. Revisa los datos ingresados e intenta de nuevo.",
+        403: "No tienes permiso para realizar esta acción. Si eres personal médico, verifica que tu cuenta esté aprobada.",
+        404: "No se encontró la información solicitada. Actualiza la página e intenta de nuevo.",
+        409: "La información ya existe o fue modificada. Actualiza la página antes de volver a intentarlo.",
+        413: "El archivo es demasiado grande. Selecciona un archivo de menor tamaño.",
+        422: "Hay datos incompletos o con un formato incorrecto. Revisa los campos e intenta de nuevo.",
+        429: "Se han realizado demasiadas solicitudes. Espera un momento antes de volver a intentarlo.",
+    }.get(status_code, "El servicio no está disponible en este momento. Intenta de nuevo más tarde.")
+
+
+def _connection_error_message(error: requests.RequestException) -> str:
+    if isinstance(error, requests.Timeout):
+        return "La solicitud tardó demasiado. Intenta de nuevo en unos momentos. Si estabas guardando información, revisa si se guardó antes de repetir la acción."
+    return "No se pudo conectar con el servicio. Revisa tu conexión e intenta de nuevo en unos momentos."
+
+
 class ApiClient:
     def __init__(self, base_url: str = API_BASE_URL):
         self.base_url = base_url.rstrip("/")
@@ -96,16 +119,10 @@ class ApiClient:
                 timeout=REQUEST_TIMEOUT,
             )
         except requests.RequestException as error:
-            raise ApiError(f"No se pudo conectar con la API ({url}): {error}") from error
+            raise ApiError(_connection_error_message(error)) from error
 
         if not response.ok:
-            try:
-                body = response.json()
-            except ValueError:
-                body = {}
-            detail = body.get("detail") if isinstance(body, dict) else None
-            detail = detail or response.text or f"HTTP {response.status_code}"
-            raise ApiError(f"API {response.status_code} en {path}: {detail}")
+            raise ApiError(_http_error_message(response.status_code, path))
 
         if response.status_code == 204 or not response.content:
             result = None
@@ -113,7 +130,7 @@ class ApiClient:
             try:
                 result = response.json()
             except ValueError as error:
-                raise ApiError(f"La API devolvió una respuesta JSON inválida en {path}.") from error
+                raise ApiError("No se pudo interpretar la respuesta del servicio. Intenta de nuevo más tarde.") from error
 
         if cache is not None and cache_key is not None:
             cache[cache_key] = (time.monotonic(), copy.deepcopy(result))
@@ -152,8 +169,8 @@ class ApiClient:
         except ApiError as error:
             return {"success": False, "error": str(error)}
 
-        if not data.get("token"):
-            return {"success": False, "error": "La respuesta del backend no contiene un token de acceso."}
+        if not isinstance(data, dict) or not data.get("token"):
+            return {"success": False, "error": "No se pudo iniciar sesión. Intenta de nuevo más tarde."}
         st.session_state["auth_token"] = data["token"]
         st.session_state["user_role"] = data.get("role")
         st.session_state["user_email"] = data.get("email", email)
@@ -721,21 +738,16 @@ class ApiClient:
                 timeout=max(REQUEST_TIMEOUT, 60.0),
             )
         except requests.RequestException as error:
-            return {"success": False, "error": f"No se pudo conectar con la API ({url}): {error}"}
+            return {"success": False, "error": _connection_error_message(error)}
 
         if not response.ok:
-            try:
-                body = response.json()
-            except ValueError:
-                body = {}
-            detail = body.get("detail") if isinstance(body, dict) else None
-            return {"success": False, "error": detail or response.text or f"HTTP {response.status_code}"}
+            return {"success": False, "error": _http_error_message(response.status_code, "/datasets/import")}
 
         self._clear_read_cache()
         try:
             return {"success": True, "data": response.json()}
         except ValueError:
-            return {"success": False, "error": "La API devolvió una respuesta inválida al importar."}
+            return {"success": False, "error": "No se pudo confirmar la importación. Revisa los datos cargados antes de volver a intentarlo."}
 
 
 api = ApiClient()

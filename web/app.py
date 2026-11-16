@@ -761,7 +761,7 @@ else:
         elif seccion == ADMIN_SECTION:
             render_admin_view()
     except ApiError as error:
-        st.error(f"No se pudo consultar la información del backend. {error}")
+        st.error(str(error))
 
     st.markdown("""
     <div class="footer">

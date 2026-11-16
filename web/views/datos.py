@@ -144,8 +144,8 @@ def render_datos_view():
         raw_bytes = archivo.getvalue()
         try:
             datos = _leer_csv_bytes(raw_bytes)
-        except ValueError as error:
-            st.error(f"No se pudo leer el CSV: {error}")
+        except ValueError:
+            st.error("No se pudo leer el archivo. Verifica que sea un CSV válido con columnas y registros.")
 
         if datos is not None:
             faltantes = _validar_columnas(datos, enfermedad)
