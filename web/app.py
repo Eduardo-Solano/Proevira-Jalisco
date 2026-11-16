@@ -41,6 +41,7 @@ _ROLES_ETIQUETAS = {
     "admin": "Administrador",
     "administrador": "Administrador",
     "ciudadano": "Vigilancia ciudadana",
+    "paciente": "Vigilancia ciudadana",
 }
 
 
@@ -53,15 +54,17 @@ def _perfil_lateral():
         rol_raw = (st.session_state.get("user_role") or "").strip().lower()
         rol_texto = _ROLES_ETIQUETAS.get(rol_raw, "Sesión activa")
 
-    usuario = correo.split("@", 1)[0].strip()
+    nombre = "" if DEMO_MODE else (st.session_state.get("user_name") or "").strip()
+    etiqueta_usuario = nombre or correo
+    usuario = nombre or correo.split("@", 1)[0].strip()
     iniciales = "".join(parte[0] for parte in usuario.replace("_", " ").replace(".", " ").split() if parte)
     iniciales = (iniciales[:2] or "US").upper()
     return (
         '<div class="sidebar-profile">'
         f'<div class="profile-avatar" role="img" aria-label="Perfil de usuario">{escape(iniciales)}</div>'
         '<div class="profile-meta">'
+        f'<strong class="profile-email" title="{escape(correo, quote=True)}">{escape(etiqueta_usuario)}</strong>'
         f'<span class="profile-role">{escape(rol_texto)}</span>'
-        f'<strong class="profile-email" title="{escape(correo, quote=True)}">{escape(correo)}</strong>'
         '</div>'
         '</div>'
     )
@@ -133,86 +136,79 @@ section[data-testid="stSidebar"] button[aria-label="Collapse sidebar"] {
     color: #cbd8d4 !important;
 }
 .sidebar-brand {
-    padding: 0 0 .9rem;
+    padding: 0 0 1.1rem;
     margin-bottom: .35rem;
-    border-bottom: 1px solid rgba(255,255,255,.12);
+    border-bottom: 1px solid rgba(255,255,255,.08);
 }
 .sidebar-brand-top {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: .5rem;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: .08rem;
 }
 .sidebar-brand-title {
-    color: #f0b65c;
-    font-size: 1.24rem;
-    font-weight: 800;
-    letter-spacing: .09em;
-    line-height: 1.1;
-}
-.sidebar-brand-badge {
-    padding: .16rem .48rem;
-    border-radius: 999px;
-    background: rgba(240,182,92,.14);
-    border: 1px solid rgba(240,182,92,.32);
-    color: #f5ca82;
-    font-size: .62rem;
+    color: #d3a9e7;
+    font-size: 1.55rem;
     font-weight: 700;
-    letter-spacing: .05em;
-    text-transform: uppercase;
+    letter-spacing: .12em;
+    line-height: 1.35;
+}
+.sidebar-brand-location {
+    color: #bbb6c2;
+    font-size: .82rem;
+    font-weight: 500;
+    letter-spacing: .08em;
 }
 .sidebar-brand-sub {
     display: block;
-    margin-top: .28rem;
-    color: #b7ceca;
-    font-size: .72rem;
-    font-weight: 500;
+    margin-top: .5rem;
+    color: #aaa6b0;
+    font-size: .75rem;
+    line-height: 1.5;
+    font-weight: 400;
     letter-spacing: .01em;
 }
 .sidebar-profile {
     display: flex;
     align-items: center;
-    gap: .7rem;
+    gap: .65rem;
     min-width: 0;
-    margin: .1rem 0 .45rem;
-    padding: .7rem .78rem;
-    border-radius: 10px;
-    background: rgba(255,255,255,.06);
-    border: 1px solid rgba(255,255,255,.10);
+    margin: .25rem 0 1.1rem;
+    padding: .65rem .2rem .35rem;
 }
 .profile-avatar {
     display: grid;
-    flex: 0 0 36px;
-    width: 36px;
-    height: 36px;
+    flex: 0 0 30px;
+    width: 30px;
+    height: 30px;
     place-items: center;
     border-radius: 50%;
-    background: linear-gradient(135deg, #f3c171 0%, #e09e3e 100%);
-    box-shadow: 0 0 0 2px rgba(240,182,92,.22);
-    color: #2f3133;
-    font-size: .78rem;
-    font-weight: 800;
-    letter-spacing: .04em;
+    background: rgba(255,255,255,.10);
+    color: #e6e1eb;
+    font-size: .65rem;
+    font-weight: 600;
+    letter-spacing: .02em;
 }
 .profile-meta {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    gap: .1rem;
+    gap: .15rem;
 }
 .profile-role {
-    color: #b7ceca;
-    font-size: .64rem;
-    font-weight: 700;
-    letter-spacing: .06em;
-    text-transform: uppercase;
+    color: #bbb6c2;
+    font-size: .7rem;
+    font-weight: 400;
+    line-height: 1.4;
 }
 .profile-email {
     min-width: 0;
     overflow: hidden;
-    color: #ffffff;
-    font-size: .76rem;
+    color: #f1eef4;
+    font-size: .85rem;
     font-weight: 600;
+    line-height: 1.4;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -240,9 +236,9 @@ section[data-testid="stSidebar"] div[data-testid="stRadio"] [data-testid="stWidg
 }
 section[data-testid="stSidebar"] div[data-testid="stRadio"] [data-testid="stWidgetLabel"] p {
     margin: 0 !important;
-    color: #9fb0ab !important;
-    font-size: .66rem !important;
-    font-weight: 700 !important;
+    color: #aaa6b0 !important;
+    font-size: .68rem !important;
+    font-weight: 500 !important;
     letter-spacing: .1em !important;
     text-transform: uppercase !important;
     line-height: 1.3 !important;
@@ -260,7 +256,7 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"] {
     padding: .62rem .88rem;
     border: 1px solid transparent;
     border-radius: 9px;
-    color: #e4ece9;
+    color: #d2ced7;
     transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
 section[data-testid="stSidebar"] label[data-testid="stRadioOption"] > div,
@@ -274,15 +270,15 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]:hover {
     color: #ffffff;
 }
 section[data-testid="stSidebar"] label[data-testid="stRadioOption"][data-selected="true"] {
-    background: linear-gradient(90deg, rgba(240,182,92,.20) 0%, rgba(255,255,255,.09) 100%);
-    border-color: rgba(240,182,92,.30);
-    box-shadow: inset 3.5px 0 0 #f0b65c;
+    background: rgba(180, 130, 207, .16);
+    border-color: rgba(211, 169, 231, .18);
+    box-shadow: inset 3px 0 0 #d3a9e7;
     color: #ffffff;
 }
 section[data-testid="stSidebar"] label[data-testid="stRadioOption"] p {
     color: inherit !important;
-    font-size: .89rem;
-    font-weight: 500;
+    font-size: .94rem;
+    font-weight: 400;
     letter-spacing: .005em;
 }
 section[data-testid="stSidebar"] label[data-testid="stRadioOption"][data-selected="true"] p {
@@ -342,8 +338,8 @@ section[data-testid="stSidebar"] [data-testid="stLayoutWrapper"]:has(.st-key-sid
 .sidebar-footer strong {
     display: block;
     color: #ffffff;
-    font-size: .79rem;
-    font-weight: 650;
+    font-size: .73rem;
+    font-weight: 500;
 }
 .st-key-sidebar_exit {
     width: 100%;
@@ -359,9 +355,9 @@ section[data-testid="stSidebar"] [data-testid="stLayoutWrapper"]:has(.st-key-sid
     transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
 .st-key-sidebar_exit button:hover {
-    border-color: #f0b65c;
+    border-color: #d3a9e7;
     color: #ffffff;
-    background: rgba(240,182,92,.14);
+    background: rgba(180,130,207,.14);
 }
 .exit-card {
     max-width: 560px;
@@ -731,7 +727,7 @@ else:
             '<div class="sidebar-brand">'
             '<div class="sidebar-brand-top">'
             '<span class="sidebar-brand-title">VIRALES</span>'
-            '<span class="sidebar-brand-badge">Jalisco</span>'
+            '<span class="sidebar-brand-location">Jalisco</span>'
             '</div>'
             '<span class="sidebar-brand-sub">Vigilancia epidemiológica estatal</span>'
             '</div>',
