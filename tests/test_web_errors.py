@@ -95,6 +95,31 @@ class WebErrorTests(unittest.TestCase):
         with patch.object(self.client, "_request", return_value=None):
             self.assertFalse(self.client.check_health())
 
+    def test_recovery_requests_report_success_and_safe_failures(self):
+        response = Mock(ok=True, status_code=202, content=b"{}")
+        response.json.return_value = {"message": "Revisa tu correo."}
+        with patch.object(api_client.requests, "request", return_value=response):
+            self.assertTrue(self.client.request_password_reset("medico@example.com")["success"])
+        with patch.object(api_client.requests, "request", return_value=self.response(400)):
+            result = self.client.reset_password("a" * 43, "NewPassword123!")
+        self.assertFalse(result["success"])
+        self.assertIn("código", result["error"])
+        self.assertNotIn("400", result["error"])
+        with patch.object(api_client.requests, "request", return_value=self.response(503)):
+            result = self.client.request_password_reset("medico@example.com")
+        self.assertIn("Contacta al administrador", result["error"])
+
+    def test_code_verification_safe_errors_and_success(self):
+        with patch.object(api_client.requests, "request", return_value=self.response(400)):
+            result = self.client.verify_recovery_code("medico@example.com", "012345")
+        self.assertFalse(result["success"])
+        self.assertIn("código", result["error"])
+        self.assertNotIn("400", result["error"])
+        response = Mock(ok=True, status_code=200, content=b"{}")
+        response.json.return_value = {"reset_token": "a" * 43}
+        with patch.object(api_client.requests, "request", return_value=response):
+            self.assertTrue(self.client.verify_recovery_code("medico@example.com", "012345")["success"])
+
 
 if __name__ == "__main__":
     unittest.main()

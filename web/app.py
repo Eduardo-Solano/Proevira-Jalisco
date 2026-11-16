@@ -603,7 +603,8 @@ div[data-testid="stSlider"] label { color: #526861; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
-if DEMO_MODE or st.session_state.get("auth_token"):
+_RESET_PASSWORD_VIEW = bool(st.query_params.get("reset_token") or st.session_state.get("_password_reset_token") or st.session_state.get("auth_view") in {"recovery", "code"})
+if DEMO_MODE or (st.session_state.get("auth_token") and not _RESET_PASSWORD_VIEW):
     st.markdown(f"""
     <style>
     header[data-testid="stHeader"] {{
@@ -715,7 +716,7 @@ if DEMO_MODE and st.session_state.get("demo_exit"):
     if st.button("Volver al panel"):
         st.session_state["demo_exit"] = False
         st.rerun()
-elif not DEMO_MODE and not st.session_state.get("auth_token"):
+elif not DEMO_MODE and (not st.session_state.get("auth_token") or _RESET_PASSWORD_VIEW):
     st.markdown(
         "<style>section[data-testid='stSidebar']{display:none!important}</style>",
         unsafe_allow_html=True,

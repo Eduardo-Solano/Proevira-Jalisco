@@ -122,6 +122,27 @@ class Usuario(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
+class PasswordRecoveryCode(Base):
+    __tablename__ = "password_recovery_codes"
+
+    user_id = Column(String(128), ForeignKey("usuarios.uid", ondelete="CASCADE"), primary_key=True)
+    code_hash = Column(String(64), nullable=False)
+    password_digest = Column(String(64), nullable=False)
+    attempts = Column(Integer, nullable=False, default=0)
+    expires_at = Column(DateTime, nullable=False)
+    requested_at = Column(DateTime, nullable=False)
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    user_id = Column(String(128), ForeignKey("usuarios.uid", ondelete="CASCADE"), primary_key=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    password_digest = Column(String(64), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    requested_at = Column(DateTime, nullable=False)
+
+
 class Sintoma(Base):
     __tablename__ = "sintomas"
 

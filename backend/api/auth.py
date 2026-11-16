@@ -1,12 +1,17 @@
 import uuid
 import datetime
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from backend.db.database import get_db
 from backend.db.models import Municipio, Sintoma, Usuario
 from backend.schemas.auth import (
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    PasswordRecoveryResponse,
+    VerifyRecoveryCodeRequest,
+    VerifyRecoveryCodeResponse,
     LoginRequest,
     LoginResponse,
     UserProfileResponse,
@@ -18,6 +23,9 @@ from backend.schemas.auth import (
     AdminUserResponse,
     AdminUserCreateRequest,
     AdminUserUpdateRequest,
+)
+from backend.core.password_recovery import (
+    RECOVERY_MESSAGE, ensure_mail_configured, request_password_reset, reset_password, verify_recovery_code,
 )
 from backend.core.security import (
     verify_password,
@@ -114,6 +122,28 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
         )
 
     return _build_login_response(user)
+
+
+@router.post("/forgot-password", response_model=PasswordRecoveryResponse, status_code=202)
+def forgot_password(request: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+    email = request.email.strip().lower()
+    if "@" not in email or "." not in email.split("@", 1)[-1] or any(c.isspace() for c in email):
+        raise HTTPException(status_code=400, detail="Ingresa un correo electrónico válido.")
+    ensure_mail_configured()
+    background_tasks.add_task(request_password_reset, email)
+    return {"message": RECOVERY_MESSAGE}
+
+
+@router.post("/reset-password", response_model=PasswordRecoveryResponse)
+def confirm_password_reset(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    reset_password(db, request.token, request.password)
+    return {"message": "Tu contraseña fue actualizada. Ya puedes iniciar sesión."}
+
+
+@router.post("/verify-recovery-code", response_model=VerifyRecoveryCodeResponse)
+def confirm_recovery_code(request: VerifyRecoveryCodeRequest, db: Session = Depends(get_db)):
+    token = verify_recovery_code(db, request.email.strip().lower(), request.code)
+    return {"reset_token": token}
 
 
 @router.get("/me", response_model=UserProfileResponse)

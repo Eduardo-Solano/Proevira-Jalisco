@@ -17,6 +17,17 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 horas
 
+    # Recuperación de contraseña por correo (sin credenciales en el repositorio).
+    PASSWORD_RESET_CODE_EXPIRE_MINUTES: int = 10
+    PASSWORD_RESET_COOLDOWN_SECONDS: int = 60
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_USE_SSL: bool = False
+    SMTP_STARTTLS: bool = True
+
     # Firebase Authentication
     FIREBASE_CREDENTIALS_PATH: Optional[str] = None
     FIREBASE_PROJECT_ID: Optional[str] = None

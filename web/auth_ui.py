@@ -13,6 +13,119 @@ def _logo(filename: str) -> str:
     return "data:image/png;base64," + base64.b64encode(image).decode("ascii")
 
 
+def _show_auth_view(view: str):
+    st.session_state["auth_view"] = view
+    st.session_state.pop("_password_reset_token", None)
+    st.query_params.pop("reset_token", None)
+    if view == "login":
+        st.session_state.pop("_recovery_email", None)
+
+
+def _render_login():
+    st.markdown("### Bienvenido de nuevo")
+    st.caption("Ingresa con tu cuenta para acceder al panel.")
+    if st.session_state.pop("_password_reset_success", False):
+        st.success("Tu contraseña fue actualizada. Inicia sesión con tu nueva contraseña.")
+    with st.form("form_login"):
+        email = st.text_input("Correo electrónico", placeholder="nombre@institucion.gob.mx")
+        password = st.text_input("Contraseña", type="password")
+        submitted = st.form_submit_button("Iniciar sesión", use_container_width=True)
+        if submitted:
+            if not email.strip() or not password:
+                st.warning("Por favor completa tu correo y contraseña.")
+            else:
+                with st.spinner("Iniciando sesión…"):
+                    result = api.login(email.strip(), password)
+                if result["success"]:
+                    st.rerun()
+                else:
+                    st.error(result.get("error", "No se pudo iniciar sesión. Intenta de nuevo."))
+    st.button("¿Olvidaste tu contraseña?", key="forgot_password", on_click=_show_auth_view, args=("recovery",))
+
+
+def _render_recovery():
+    st.markdown("### Recupera tu acceso")
+    st.caption("Ingresa el correo de tu cuenta. Te enviaremos un código de 6 dígitos para recuperar tu acceso.")
+    with st.form("form_password_recovery"):
+        email = st.text_input("Correo electrónico", placeholder="nombre@institucion.gob.mx", key="recovery_email")
+        submitted = st.form_submit_button("Enviar código de recuperación", use_container_width=True)
+        if submitted:
+            email = email.strip()
+            if "@" not in email or "." not in email.split("@", 1)[-1] or any(c.isspace() for c in email):
+                st.warning("Ingresa un correo electrónico válido.")
+            else:
+                with st.spinner("Solicitando código de recuperación…"):
+                    result = api.request_password_reset(email)
+                if result["success"]:
+                    st.session_state["_recovery_email"] = email.lower()
+                    st.session_state["auth_view"] = "code"
+                    st.session_state["_recovery_sent"] = True
+                    st.rerun()
+                else:
+                    st.error(result["error"])
+    st.button("Volver a iniciar sesión", key="back_from_recovery", on_click=_show_auth_view, args=("login",))
+
+
+def _render_code():
+    st.markdown("### Revisa tu correo")
+    if st.session_state.pop("_recovery_sent", False):
+        st.success("Código de recuperación enviado.")
+    st.caption("Escribe el código de 6 dígitos que recibiste. Revisa también la carpeta de correo no deseado.")
+    with st.form("form_recovery_code"):
+        code = st.text_input("Código de recuperación", placeholder="000000", max_chars=6, key="recovery_code")
+        submitted = st.form_submit_button("Verificar código", use_container_width=True)
+        if submitted:
+            code = code.strip()
+            if len(code) != 6 or not code.isascii() or not code.isdigit():
+                st.warning("Ingresa los 6 dígitos del código que recibiste.")
+            else:
+                with st.spinner("Verificando código…"):
+                    result = api.verify_recovery_code(st.session_state["_recovery_email"], code)
+                if result["success"]:
+                    st.session_state["_password_reset_token"] = result["reset_token"]
+                    st.rerun()
+                else:
+                    st.error(result["error"])
+    st.caption("Tienes hasta 5 intentos. Para recibir otro código, espera al menos un minuto; usa siempre el más reciente.")
+    if st.button("Reenviar código", key="resend_recovery_code"):
+        with st.spinner("Solicitando otro código…"):
+            result = api.request_password_reset(st.session_state["_recovery_email"])
+        if result["success"]:
+            st.success("Código solicitado. Si ya pasó un minuto, recibirás uno nuevo; de lo contrario, usa el último que recibiste.")
+        else:
+            st.error(result["error"])
+    st.button("Cambiar correo", key="change_recovery_email", on_click=_show_auth_view, args=("recovery",))
+    st.button("Volver a iniciar sesión", key="back_from_code", on_click=_show_auth_view, args=("login",))
+
+
+def _render_reset():
+    st.markdown("### Elige una nueva contraseña")
+    st.caption("Usa al menos 8 caracteres. Confirma tu nueva contraseña para guardar el cambio.")
+    with st.form("form_reset_password"):
+        password = st.text_input("Nueva contraseña", type="password", key="reset_password")
+        confirmation = st.text_input("Confirmar contraseña", type="password", key="reset_confirmation")
+        submitted = st.form_submit_button("Guardar nueva contraseña", use_container_width=True)
+        if submitted:
+            if len(password) < 8:
+                st.warning("La contraseña debe tener al menos 8 caracteres.")
+            elif len(password.encode("utf-8")) > 72:
+                st.warning("La contraseña es demasiado larga. Usa una más corta; las letras con acentos y los símbolos pueden ocupar más espacio.")
+            elif password != confirmation:
+                st.warning("Las contraseñas no coinciden. Revísalas e intenta de nuevo.")
+            else:
+                with st.spinner("Actualizando contraseña…"):
+                    result = api.reset_password(st.session_state["_password_reset_token"], password)
+                if result["success"]:
+                    api.logout()
+                    _show_auth_view("login")
+                    st.session_state["_password_reset_success"] = True
+                    st.rerun()
+                else:
+                    st.error(result["error"])
+    st.button("Solicitar un nuevo código", key="request_new_reset", on_click=_show_auth_view, args=("recovery",))
+    st.button("Volver a iniciar sesión", key="back_from_reset", on_click=_show_auth_view, args=("login",))
+
+
 def render_auth_page():
     """Renderiza el portal de acceso institucional con diseño oficial de Jalisco."""
 
@@ -60,6 +173,11 @@ header[data-testid="stHeader"], section[data-testid="stSidebar"] { display: none
 }
 .st-key-auth_card [data-testid="stFormSubmitButton"] button:hover { background: #511a63; border-color: #511a63; color: #fff; }
 .st-key-auth_card button:focus-visible { outline: 3px solid #cba9d6; outline-offset: 3px; }
+.st-key-auth_card [data-testid="stButton"] button {
+    background: transparent; border: 0; color: #652379; padding: .4rem 0;
+    min-height: 44px; box-shadow: none;
+}
+.st-key-auth_card [data-testid="stButton"] button:hover { color: #511a63; text-decoration: underline; }
 .auth-institution { border-top: 1px solid #eeeaf1; margin-top: 1.8rem; padding-top: 1.35rem; text-align: center; }
 .auth-institution img { width: 145px; max-width: 60%; height: auto; }
 .auth-institution p { color: #797180; font-size: .75rem; margin: .4rem 0 0; }
@@ -91,23 +209,18 @@ header[data-testid="stHeader"], section[data-testid="stSidebar"] { display: none
             unsafe_allow_html=True,
         )
 
-        st.markdown("### Bienvenido de nuevo")
-        st.caption("Ingresa con tu cuenta para acceder al panel.")
-        with st.form("form_login"):
-            email = st.text_input("Correo electrónico", placeholder="nombre@institucion.gob.mx")
-            password = st.text_input("Contraseña", type="password")
-            btn_submit = st.form_submit_button("Iniciar sesión", use_container_width=True)
-
-            if btn_submit:
-                if not email.strip() or not password:
-                    st.warning("Por favor completa tu correo y contraseña.")
-                else:
-                    with st.spinner("Iniciando sesión…"):
-                        result = api.login(email.strip(), password)
-                    if result["success"]:
-                        st.rerun()
-                    else:
-                        st.error(result.get("error", "No se pudo iniciar sesión. Intenta de nuevo."))
+        # Los correos anteriores con enlace se sustituyen por el flujo de código.
+        if st.query_params.get("reset_token"):
+            _show_auth_view("recovery")
+            st.info("Ahora puedes recuperar tu acceso con un código por correo. Solicita uno aquí.")
+        if st.session_state.get("_password_reset_token"):
+            _render_reset()
+        elif st.session_state.get("auth_view") == "code" and st.session_state.get("_recovery_email"):
+            _render_code()
+        elif st.session_state.get("auth_view") == "recovery":
+            _render_recovery()
+        else:
+            _render_login()
 
         st.markdown(
             f'<div class="auth-institution"><img src="{_logo("jalisco.png")}" alt="Jalisco, Gobierno del Estado">'

@@ -80,9 +80,11 @@ async def on_startup():
                 connection.execute(
                     text("ALTER TABLE sintomas ADD COLUMN temperatura FLOAT")
                 )
-    from backend.db.models import AlertaPredictivaBorrador, ImportacionDataset
+    from backend.db.models import AlertaPredictivaBorrador, ImportacionDataset, PasswordResetToken, PasswordRecoveryCode
     AlertaPredictivaBorrador.__table__.create(bind=engine, checkfirst=True)
     ImportacionDataset.__table__.create(bind=engine, checkfirst=True)
+    PasswordResetToken.__table__.create(bind=engine, checkfirst=True)
+    PasswordRecoveryCode.__table__.create(bind=engine, checkfirst=True)
     from backend.core.inference import inference_engine
     inference_engine.load()
     logger.info(f"API Documentación disponible en /docs")

@@ -1,6 +1,28 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=150)
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=40, max_length=128)
+    password: str = Field(min_length=8, max_length=72)
+
+
+class VerifyRecoveryCodeRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=150)
+    code: str = Field(pattern=r"^[0-9]{6}$")
+
+
+class VerifyRecoveryCodeResponse(BaseModel):
+    reset_token: str
+
+
+class PasswordRecoveryResponse(BaseModel):
+    message: str
 
 
 class LoginRequest(BaseModel):

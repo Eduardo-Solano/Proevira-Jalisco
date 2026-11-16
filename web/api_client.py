@@ -38,6 +38,12 @@ class ApiError(RuntimeError):
 
 def _http_error_message(status_code: int, path: str) -> str:
     """Traduce errores del servicio sin exponer su respuesta ni datos internos."""
+    if path == "/auth/reset-password" and status_code in {400, 422}:
+        return "No se pudo cambiar la contraseña. Revisa sus requisitos o solicita un nuevo código si la verificación ya venció."
+    if path == "/auth/verify-recovery-code" and status_code in {400, 422}:
+        return "El código es incorrecto, venció o alcanzó el límite de intentos. Revisa el código o solicita uno nuevo."
+    if path == "/auth/forgot-password" and status_code == 503:
+        return "La recuperación por correo no está disponible en este momento. Contacta al administrador."
     if status_code == 401:
         if path == "/auth/login":
             return "El correo o la contraseña son incorrectos. Revisa tus datos e intenta de nuevo."
@@ -181,6 +187,34 @@ class ApiClient:
         st.session_state.pop("_predictive_drafts_auto_attempted", None)
         st.session_state.pop("_predictive_drafts_generation_error", None)
         return {"success": True, "data": data}
+
+    def request_password_reset(self, email: str) -> Dict[str, Any]:
+        return self._password_recovery_request("/auth/forgot-password", {"email": email})
+
+    def reset_password(self, token: str, password: str) -> Dict[str, Any]:
+        return self._password_recovery_request("/auth/reset-password", {"token": token, "password": password})
+
+    def verify_recovery_code(self, email: str, code: str) -> Dict[str, Any]:
+        if DEMO_MODE:
+            return {"success": False, "error": "La recuperación no está disponible en modo demostración."}
+        try:
+            data = self._request("POST", "/auth/verify-recovery-code", json={"email": email, "code": code}, headers={"Content-Type": "application/json"})
+        except ApiError as error:
+            return {"success": False, "error": str(error)}
+        if not isinstance(data, dict) or not isinstance(data.get("reset_token"), str) or not data["reset_token"]:
+            return {"success": False, "error": "No se pudo confirmar la verificación. Intenta de nuevo."}
+        return {"success": True, "reset_token": data["reset_token"]}
+
+    def _password_recovery_request(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        if DEMO_MODE:
+            return {"success": False, "error": "La recuperación de contraseña no está disponible en modo demostración."}
+        try:
+            data = self._request("POST", path, json=payload, headers={"Content-Type": "application/json"})
+        except ApiError as error:
+            return {"success": False, "error": str(error)}
+        if not isinstance(data, dict) or not isinstance(data.get("message"), str):
+            return {"success": False, "error": "No se pudo confirmar la solicitud. Intenta de nuevo más tarde."}
+        return {"success": True, "message": data["message"]}
 
     def register_medico(self, email: str, password: str, institucion: str, cedula: str) -> Dict[str, Any]:
         if DEMO_MODE:
