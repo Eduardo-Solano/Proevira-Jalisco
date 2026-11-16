@@ -23,6 +23,8 @@ from connection_ui import render_connection_status
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "jalisco.png")
 with open(LOGO_PATH, "rb") as logo_file:
     LOGO_BASE64 = base64.b64encode(logo_file.read()).decode("ascii")
+with open(os.path.join(BASE_DIR, "assets", "Virales.png"), "rb") as logo_file:
+    VIRALES_LOGO_BASE64 = base64.b64encode(logo_file.read()).decode("ascii")
 
 
 def _salir_del_panel():
@@ -647,7 +649,13 @@ if DEMO_MODE or st.session_state.get("auth_token"):
         margin-left: 40px;
     }}
     header[data-testid="stHeader"] [data-testid="stToolbar"]::before {{
-        content: "VIRALES · Vigilancia epidemiológica\\A Dengue · Influenza · COVID-19";
+        content: "Vigilancia epidemiológica\\A Dengue · Influenza · COVID-19";
+        display: flex;
+        align-items: center;
+        box-sizing: border-box;
+        min-height: 64px;
+        padding-left: 125px;
+        background: url("data:image/png;base64,{VIRALES_LOGO_BASE64}") no-repeat left center / 108px auto;
         white-space: pre-line;
         color: #454545;
         font: 700 1.08rem/1.35 "Segoe UI", "Aptos", sans-serif;
@@ -672,7 +680,12 @@ if DEMO_MODE or st.session_state.get("auth_token"):
             background: #fff;
         }}
         header[data-testid="stHeader"] [data-testid="stToolbar"]::before {{
-            font-size: .88rem;
+            content: "";
+            flex: 0 0 86px;
+            height: 50px;
+            min-height: 50px;
+            padding-left: 0;
+            background-size: contain;
         }}
         header[data-testid="stHeader"] [data-testid="stToolbar"]::after {{
             flex-basis: 126px;

@@ -19,11 +19,18 @@ def render_auth_page():
     st.markdown("""
 <style>
 header[data-testid="stHeader"], section[data-testid="stSidebar"] { display: none !important; }
-.stApp, [data-testid="stAppViewContainer"] {
+.stApp { background: #f7f6f9 !important; }
+[data-testid="stAppViewContainer"] {
     background:
-        radial-gradient(ellipse at 10% 10%, rgba(116, 55, 139, .09), transparent 50%),
-        radial-gradient(ellipse at 95% 85%, rgba(164, 139, 184, .12), transparent 50%),
+        radial-gradient(circle at 0% 100%, transparent 238px, rgba(116, 55, 139, .08) 239px, rgba(116, 55, 139, .08) 240px, transparent 241px),
+        radial-gradient(circle at 0% 100%, transparent 290px, rgba(116, 55, 139, .05) 291px, rgba(116, 55, 139, .05) 292px, transparent 293px),
+        radial-gradient(circle at 100% 0%, transparent 210px, rgba(116, 55, 139, .07) 211px, rgba(116, 55, 139, .07) 212px, transparent 213px),
+        radial-gradient(ellipse at 5% 15%, rgba(116, 55, 139, .12), transparent 48%),
+        radial-gradient(ellipse at 95% 85%, rgba(164, 139, 184, .17), transparent 48%),
+        radial-gradient(circle, rgba(101, 35, 121, .07) .8px, transparent 1px),
         #f7f6f9 !important;
+    background-size: auto, auto, auto, auto, auto, 24px 24px !important;
+    background-attachment: fixed !important;
 }
 [data-testid="stMainBlockContainer"] {
     box-sizing: border-box;
@@ -58,6 +65,14 @@ header[data-testid="stHeader"], section[data-testid="stSidebar"] { display: none
 .auth-institution p { color: #797180; font-size: .75rem; margin: .4rem 0 0; }
 .auth-footnote { text-align: center; color: #716979; font-size: .75rem; margin: 1rem 0; line-height: 1.7; overflow-wrap: anywhere; }
 @media (max-width: 480px) {
+    [data-testid="stAppViewContainer"] {
+        background:
+            radial-gradient(ellipse at 0% 0%, rgba(116, 55, 139, .10), transparent 60%),
+            radial-gradient(ellipse at 100% 100%, rgba(164, 139, 184, .13), transparent 60%),
+            #f7f6f9 !important;
+        background-size: auto !important;
+        background-attachment: scroll !important;
+    }
     .st-key-auth_card { padding: 1.5rem 1.15rem 1.25rem; border-radius: 18px; }
     .auth-identity img { width: 160px; }
 }
