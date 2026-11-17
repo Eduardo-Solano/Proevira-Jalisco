@@ -105,7 +105,7 @@ def render_predicciones_view():
     )
     with st.container(border=True):
         _titulo("Elige qué consultar")
-        f1, f2, f3, f4 = st.columns([1.2, 1, 1, 0.9])
+        f1, f2, f3 = st.columns([1.2, 1, 1])
         with f1:
             if cobertura == "Municipio":
                 mun = st.selectbox(
@@ -131,11 +131,6 @@ def render_predicciones_view():
                 format_func=lambda n: f"{n} semana{'s' if n != 1 else ''}",
                 key="pred_horizon",
             )
-        with f4:
-            st.markdown("<div style='height:1.75rem'></div>", unsafe_allow_html=True)
-            if st.button("Actualizar datos", use_container_width=True, key="pred_refresh_btn"):
-                api._clear_read_cache()
-                st.rerun()
 
     es_region = cobertura == "Región Centro"
     nombre_municipio = "Región Centro" if es_region else MUNICIPIOS_JALISCO[mun]["nombre"]

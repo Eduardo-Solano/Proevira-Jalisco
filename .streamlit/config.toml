@@ -2,7 +2,7 @@
 base = "light"
 backgroundColor = "#F5F7FA"
 secondaryBackgroundColor = "#FFFFFF"
-primaryColor = "#1F3A8A"
+primaryColor = "#652379"
 textColor = "#1A1A1A"
 
 [theme.sidebar]

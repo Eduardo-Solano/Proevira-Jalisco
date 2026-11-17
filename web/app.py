@@ -490,10 +490,55 @@ section[data-testid="stSidebar"] [data-testid="stLayoutWrapper"]:has(.st-key-sid
     font-size: .93rem;
     font-weight: 650;
 }
-.stDownloadButton button {
-    border-color: #d6e2dc;
-    color: #315d53;
+/* Acciones del panel, formularios, descargas y carga de archivos. */
+.stApp :is(
+    [data-testid="stButton"],
+    [data-testid="stFormSubmitButton"],
+    [data-testid="stDownloadButton"],
+    [data-testid="stLinkButton"],
+    [data-testid="stFileUploaderDropzone"]
+) :is(button, a) {
+    background: #652379;
+    border: 1px solid #652379;
+    color: #fff;
+    min-height: 44px;
+    border-radius: 9px;
+    padding: .5rem 1rem;
     font-weight: 600;
+    text-decoration: none;
+    transition: background .15s ease, border-color .15s ease;
+}
+.stApp :is(
+    [data-testid="stButton"],
+    [data-testid="stFormSubmitButton"],
+    [data-testid="stDownloadButton"],
+    [data-testid="stLinkButton"],
+    [data-testid="stFileUploaderDropzone"]
+) :is(button, a):hover {
+    background: #511a63;
+    border-color: #511a63;
+    color: #fff;
+}
+.stApp :is(
+    [data-testid="stButton"],
+    [data-testid="stFormSubmitButton"],
+    [data-testid="stDownloadButton"],
+    [data-testid="stLinkButton"],
+    [data-testid="stFileUploaderDropzone"]
+) :is(button, a):focus-visible {
+    outline: 3px solid #cba9d6;
+    outline-offset: 3px;
+}
+.stApp :is(
+    [data-testid="stButton"],
+    [data-testid="stFormSubmitButton"],
+    [data-testid="stDownloadButton"],
+    [data-testid="stFileUploaderDropzone"]
+) button:disabled {
+    background: #e6ddea;
+    border-color: #d4c3dc;
+    color: #6e5a77;
+    cursor: not-allowed;
 }
 .stDataFrame [data-testid="stElementToolbar"] { display: none !important; }
 .disease-card {

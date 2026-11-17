@@ -174,10 +174,10 @@ header[data-testid="stHeader"], section[data-testid="stSidebar"] { display: none
 .st-key-auth_card [data-testid="stFormSubmitButton"] button:hover { background: #511a63; border-color: #511a63; color: #fff; }
 .st-key-auth_card button:focus-visible { outline: 3px solid #cba9d6; outline-offset: 3px; }
 .st-key-auth_card [data-testid="stButton"] button {
-    background: transparent; border: 0; color: #652379; padding: .4rem 0;
-    min-height: 44px; box-shadow: none;
+    background: #652379; border: 1px solid #652379; color: #fff; padding: .5rem 1rem;
+    min-height: 44px; border-radius: 10px; font-weight: 600;
 }
-.st-key-auth_card [data-testid="stButton"] button:hover { color: #511a63; text-decoration: underline; }
+.st-key-auth_card [data-testid="stButton"] button:hover { background: #511a63; border-color: #511a63; color: #fff; }
 .auth-institution { border-top: 1px solid #eeeaf1; margin-top: 1.8rem; padding-top: 1.35rem; text-align: center; }
 .auth-institution img { width: 145px; max-width: 60%; height: auto; }
 .auth-institution p { color: #797180; font-size: .75rem; margin: .4rem 0 0; }
