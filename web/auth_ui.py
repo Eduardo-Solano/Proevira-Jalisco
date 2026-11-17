@@ -6,7 +6,7 @@ import base64
 from pathlib import Path
 
 import streamlit as st
-from api_client import api
+from api_client import MUNICIPIOS_JALISCO, api
 
 def _logo(filename: str) -> str:
     image = (Path(__file__).parent / "assets" / filename).read_bytes()
@@ -40,7 +40,43 @@ def _render_login():
                     st.rerun()
                 else:
                     st.error(result.get("error", "No se pudo iniciar sesión. Intenta de nuevo."))
-    st.button("¿Olvidaste tu contraseña?", key="forgot_password", on_click=_show_auth_view, args=("recovery",))
+    st.markdown('<a class="auth-link" href="?auth=recovery" target="_self">¿Olvidaste tu contraseña?</a>', unsafe_allow_html=True)
+    st.markdown('¿Aún no tienes cuenta? <a class="auth-link" href="?auth=register" target="_self">Registrarse como médico</a>', unsafe_allow_html=True)
+
+
+def _render_register():
+    st.markdown("### Registro de médicos")
+    st.caption("Envía tus datos para revisión. Administración deberá aprobar tu solicitud antes de que puedas acceder.")
+    if st.session_state.get("_registration_sent"):
+        st.success("Solicitud enviada. Tus datos están en Administración, pendientes de verificación. Podrás iniciar sesión cuando tu cuenta sea aprobada.")
+    else:
+        with st.form("form_register_medico", clear_on_submit=False):
+            email = st.text_input("Correo electrónico", key="register_email", max_chars=150)
+            institucion = st.text_input("Institución", key="register_institucion", max_chars=150)
+            cedula = st.text_input("Cédula profesional", key="register_cedula", max_chars=50)
+            municipio = st.selectbox("Municipio de atención", list(MUNICIPIOS_JALISCO), format_func=lambda k: MUNICIPIOS_JALISCO[k]["nombre"], key="register_municipio")
+            password = st.text_input("Contraseña", type="password", key="register_password", help="Al menos 8 caracteres.")
+            confirmation = st.text_input("Confirmar contraseña", type="password", key="register_confirmation")
+            submitted = st.form_submit_button("Enviar solicitud de registro", use_container_width=True)
+            if submitted:
+                email = email.strip().lower()
+                if "@" not in email or "." not in email.split("@", 1)[-1] or any(c.isspace() for c in email):
+                    st.warning("Ingresa un correo electrónico válido.")
+                elif not institucion.strip() or not cedula.strip():
+                    st.warning("Completa tu institución y cédula profesional.")
+                elif len(password) < 8 or len(password.encode("utf-8")) > 72:
+                    st.warning("Usa una contraseña de al menos 8 caracteres y hasta 72 bytes.")
+                elif password != confirmation:
+                    st.warning("Las contraseñas no coinciden.")
+                else:
+                    with st.spinner("Enviando solicitud…"):
+                        result = api.register_medico(email, password, institucion.strip(), cedula.strip(), municipio_id=municipio)
+                    if result.get("success"):
+                        st.session_state["_registration_sent"] = True
+                        st.rerun()
+                    else:
+                        st.error(result.get("error", "No se pudo enviar la solicitud."))
+    st.markdown('<a class="auth-link" href="?auth=login" target="_self">Volver a iniciar sesión</a>', unsafe_allow_html=True)
 
 
 def _render_recovery():
@@ -178,6 +214,9 @@ header[data-testid="stHeader"], section[data-testid="stSidebar"] { display: none
     min-height: 44px; border-radius: 10px; font-weight: 600;
 }
 .st-key-auth_card [data-testid="stButton"] button:hover { background: #511a63; border-color: #511a63; color: #fff; }
+.st-key-auth_card a.auth-link { color: #652379; text-decoration: underline; }
+.st-key-auth_card a.auth-link:hover { color: #511a63; }
+.st-key-auth_card a.auth-link:focus-visible { outline: 3px solid #cba9d6; outline-offset: 3px; }
 .auth-institution { border-top: 1px solid #eeeaf1; margin-top: 1.8rem; padding-top: 1.35rem; text-align: center; }
 .auth-institution img { width: 145px; max-width: 60%; height: auto; }
 .auth-institution p { color: #797180; font-size: .75rem; margin: .4rem 0 0; }
@@ -209,6 +248,15 @@ header[data-testid="stHeader"], section[data-testid="stSidebar"] { display: none
             unsafe_allow_html=True,
         )
 
+        requested_view = st.query_params.get("auth")
+        if requested_view in {"login", "recovery", "register"}:
+            _show_auth_view(requested_view)
+            st.query_params.pop("auth", None)
+        if st.session_state.get("auth_view") != "register":
+            st.session_state.pop("_registration_sent", None)
+            for key in ("register_password", "register_confirmation"):
+                st.session_state.pop(key, None)
+
         # Los correos anteriores con enlace se sustituyen por el flujo de código.
         if st.query_params.get("reset_token"):
             _show_auth_view("recovery")
@@ -217,6 +265,8 @@ header[data-testid="stHeader"], section[data-testid="stSidebar"] { display: none
             _render_reset()
         elif st.session_state.get("auth_view") == "code" and st.session_state.get("_recovery_email"):
             _render_code()
+        elif st.session_state.get("auth_view") == "register":
+            _render_register()
         elif st.session_state.get("auth_view") == "recovery":
             _render_recovery()
         else:

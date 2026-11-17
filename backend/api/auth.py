@@ -121,6 +121,8 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    if user.role == "medico" and not user.verificado:
+        raise HTTPException(status_code=403, detail="Tu solicitud médica está pendiente de aprobación por Administración")
     return _build_login_response(user)
 
 
@@ -248,7 +250,16 @@ def register_medico(request: RegisterMedicoRequest, db: Session = Depends(get_db
     Registro público de médicos. Se crea en estado verificado = False
     hasta que un funcionario gubernamental apruebe su cédula.
     """
-    existing = db.query(Usuario).filter(Usuario.email == request.email).first()
+    email = _validate_email_password(request.email, request.password)
+    if any(c.isspace() for c in email) or len(email) > 150:
+        raise HTTPException(status_code=400, detail="Ingresa un correo electrónico válido")
+    if len(request.password) < 8 or len(request.password.encode("utf-8")) > 72:
+        raise HTTPException(status_code=400, detail="Usa una contraseña de al menos 8 caracteres y hasta 72 bytes")
+    institucion, cedula = request.institucion.strip(), request.cedula.strip()
+    if not institucion or not cedula or len(institucion) > 150 or len(cedula) > 50:
+        raise HTTPException(status_code=400, detail="Completa una institución y cédula profesional válidas")
+    municipio_id = _validate_municipio_id(db, request.municipio_id)
+    existing = db.query(Usuario).filter(func.lower(Usuario.email) == email).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -258,21 +269,21 @@ def register_medico(request: RegisterMedicoRequest, db: Session = Depends(get_db
     uid = f"med_{uuid.uuid4().hex[:12]}"
     new_medico = Usuario(
         uid=uid,
-        email=request.email,
+        email=email,
         hashed_password=get_password_hash(request.password),
         role="medico",
-        municipio_id=request.municipio_id,
-        institucion=request.institucion,
-        cedula=request.cedula,
+        municipio_id=municipio_id,
+        institucion=institucion,
+        cedula=cedula,
         verificado=False,
-        created_at=datetime.datetime.utcnow()
+        created_at=_utcnow_naive()
     )
     db.add(new_medico)
     db.commit()
 
     return RegisterMedicoResponse(
         uid=uid,
-        email=request.email,
+        email=email,
         role="medico",
         verificado=False,
         mensaje="Registro exitoso. Tu cuenta está en proceso de validación por la Secretaría de Salud."

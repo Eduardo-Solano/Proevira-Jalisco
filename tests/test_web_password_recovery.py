@@ -14,7 +14,8 @@ SOURCE = 'from auth_ui import render_auth_page\nrender_auth_page()'
 class WebPasswordRecoveryTests(unittest.TestCase):
     def request_code(self):
         app = AppTest.from_string(SOURCE, default_timeout=15).run()
-        app.button(key='forgot_password').click().run()
+        app.query_params['auth'] = 'recovery'
+        app.run()
         app.text_input(key='recovery_email').set_value('medico@example.com')
         with patch.object(auth_ui.api, 'request_password_reset', return_value={'success': True, 'message': 'Code sent.'}):
             app.button[0].click().run()

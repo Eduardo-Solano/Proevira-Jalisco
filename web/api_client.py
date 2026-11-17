@@ -216,14 +216,14 @@ class ApiClient:
             return {"success": False, "error": "No se pudo confirmar la solicitud. Intenta de nuevo más tarde."}
         return {"success": True, "message": data["message"]}
 
-    def register_medico(self, email: str, password: str, institucion: str, cedula: str) -> Dict[str, Any]:
+    def register_medico(self, email: str, password: str, institucion: str, cedula: str, municipio_id: Optional[str] = None) -> Dict[str, Any]:
         if DEMO_MODE:
             return {"success": False, "error": "El registro está deshabilitado en modo de demostración."}
         try:
             data = self._request(
                 "POST",
                 "/auth/register-medico",
-                json={"email": email, "password": password, "institucion": institucion, "cedula": cedula},
+                json={"email": email, "password": password, "institucion": institucion, "cedula": cedula, "municipio_id": municipio_id},
                 headers={"Content-Type": "application/json"},
             )
             return {"success": True, "data": data}
@@ -653,7 +653,7 @@ class ApiClient:
             params["verificado"] = verificado
         if search:
             params["search"] = search
-        return self._request("GET", "/auth/users", params=params)
+        return self._request("GET", "/auth/users", params=params, use_cache=False)
 
     def verify_medico(self, uid: str) -> Dict[str, Any]:
         if DEMO_MODE:
