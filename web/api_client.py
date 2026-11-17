@@ -130,6 +130,8 @@ class ApiClient:
             raise ApiError(_connection_error_message(error)) from error
 
         if not response.ok:
+            if response.status_code == 401 and path != "/auth/login" and st.session_state.get("_browser_session_id"):
+                self.logout()
             raise ApiError(_http_error_message(response.status_code, path))
 
         if response.status_code == 204 or not response.content:
@@ -184,6 +186,11 @@ class ApiClient:
         st.session_state["user_email"] = data.get("email", email)
         st.session_state["user_uid"] = data.get("uid")
         st.session_state["municipio_id"] = data.get("municipio_id")
+        if __package__:
+            from .browser_session import remember_login
+        else:
+            from browser_session import remember_login
+        remember_login()
         st.session_state.pop("_predictive_drafts_auto_attempted", None)
         st.session_state.pop("_predictive_drafts_generation_error", None)
         return {"success": True, "data": data}
@@ -231,6 +238,11 @@ class ApiClient:
             return {"success": False, "error": str(error)}
 
     def logout(self) -> None:
+        if __package__:
+            from .browser_session import forget_login
+        else:
+            from browser_session import forget_login
+        forget_login()
         self._clear_read_cache()
         for key in (
             "auth_token",

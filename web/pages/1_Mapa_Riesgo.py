@@ -15,8 +15,13 @@ from views.mapa import render_mapa_view
 
 st.set_page_config(page_title="Mapa de Riesgo - Jalisco", page_icon="🗺️", layout="wide")
 
+from browser_session import restore_browser_session, watch_session_expiry
+
+restore_browser_session()
 if "auth_token" not in st.session_state:
     st.warning("⚠️ Debes iniciar sesión en la página principal.")
     st.stop()
+
+watch_session_expiry()
 
 render_mapa_view()

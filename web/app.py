@@ -19,6 +19,7 @@ from views.admin import render_admin_view
 from auth_ui import render_auth_page
 from api_client import DEMO_MODE, ApiError
 from connection_ui import render_connection_status
+from browser_session import restore_browser_session, watch_session_expiry
 
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "jalisco.png")
 with open(LOGO_PATH, "rb") as logo_file:
@@ -648,6 +649,9 @@ div[data-testid="stSlider"] label { color: #526861; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
+if not DEMO_MODE:
+    restore_browser_session()
+
 _RESET_PASSWORD_VIEW = bool(st.query_params.get("reset_token") or st.session_state.get("_password_reset_token") or st.session_state.get("auth_view") in {"recovery", "code"})
 if DEMO_MODE or (st.session_state.get("auth_token") and not _RESET_PASSWORD_VIEW):
     st.markdown(f"""
@@ -766,8 +770,12 @@ elif not DEMO_MODE and (not st.session_state.get("auth_token") or _RESET_PASSWOR
         "<style>section[data-testid='stSidebar']{display:none!important}</style>",
         unsafe_allow_html=True,
     )
-    render_auth_page()
+    auth_placeholder = st.empty()
+    with auth_placeholder.container():
+        render_auth_page(on_login=auth_placeholder.empty)
 else:
+    if not DEMO_MODE:
+        watch_session_expiry()
     with st.sidebar:
         st.markdown(
             '<div class="sidebar-brand">'
@@ -808,7 +816,8 @@ else:
 
     try:
         if seccion == NAV[0]:
-            render_resumen_view()
+            with st.spinner("Cargando panorama epidemiol\u00f3gico..."):
+                render_resumen_view()
         elif seccion == NAV[1]:
             render_mapa_view()
         elif seccion == NAV[2]:

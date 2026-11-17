@@ -295,3 +295,18 @@ streamlit run web/app.py
 ```
 
 El dashboard se conecta al backend por defecto (`http://127.0.0.1:8000/api/v1`) y requiere iniciar sesión con un usuario creado en el backend. Puedes configurar otra URL mediante `API_BASE_URL`. Para abrir únicamente la demostración sintética, inicia Streamlit con `PROEVIRA_DEMO_MODE=true`.
+
+
+## Sesiones del panel web
+
+Al recargar el navegador, el panel recupera la sesión y abre Panorama. Las
+interacciones dentro del panel mantienen la sección seleccionada. La sesión
+vence tras 30 minutos sin interacción o cuando vence el token de acceso del
+backend, lo que ocurra primero. Cerrar sesión revoca el acceso guardado.
+
+Configura `WEB_SESSION_IDLE_MINUTES` en el entorno del servicio web (o en `.env`
+si usas Docker Compose) para cambiar el tiempo de inactividad. El navegador
+conserva un identificador aleatorio; los datos de sesión se guardan en
+`web/.sessions.sqlite3`, excluido de Git. `WEB_SESSION_STORE` permite cambiar
+esa ruta. Conserva ese archivo entre reinicios del servicio; varias instancias
+web necesitan compartir el mismo almacenamiento de sesiones.

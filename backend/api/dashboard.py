@@ -156,7 +156,8 @@ def get_dashboard_summary(
             "covid": round(total_covid, 1)
         },
         "tendencia": tendencia,
-        "por_municipio": por_municipio
+        "por_municipio": por_municipio,
+        "predicciones": {"dengue": bulk_dengue, "influenza": bulk_flu, "covid": bulk_covid},
     }
 
 

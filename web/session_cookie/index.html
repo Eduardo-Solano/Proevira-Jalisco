@@ -1,0 +1,15 @@
+<!doctype html>
+<html><head><meta charset="utf-8"></head><body>
+<script>
+const send = (type, data = {}) => parent.postMessage({isStreamlitMessage: true, type, ...data}, "*");
+window.addEventListener("message", event => {
+  if (event.source !== parent || event.data.type !== "streamlit:render") return;
+  const {name, value, max_age} = event.data.args;
+  const secure = location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Path=/; Max-Age=${max_age}; SameSite=Lax${secure}`;
+  send("streamlit:setFrameHeight", {height: 0});
+});
+send("streamlit:componentReady", {apiVersion: 1});
+send("streamlit:setFrameHeight", {height: 0});
+</script>
+</body></html>

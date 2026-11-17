@@ -3,11 +3,13 @@ Módulo de interfaz de autenticación con identidad oficial del Gobierno de Jali
 """
 
 import base64
+from functools import lru_cache
 from pathlib import Path
 
 import streamlit as st
 from api_client import MUNICIPIOS_JALISCO, api
 
+@lru_cache(maxsize=2)
 def _logo(filename: str) -> str:
     image = (Path(__file__).parent / "assets" / filename).read_bytes()
     return "data:image/png;base64," + base64.b64encode(image).decode("ascii")
@@ -21,9 +23,11 @@ def _show_auth_view(view: str):
         st.session_state.pop("_recovery_email", None)
 
 
-def _render_login():
+def _render_login(on_login=None):
     st.markdown("### Bienvenido de nuevo")
     st.caption("Ingresa con tu cuenta para acceder al panel.")
+    if st.session_state.pop("_session_expired", False):
+        st.info("Tu sesión expiró por inactividad o alcanzó su tiempo máximo. Inicia sesión nuevamente.")
     if st.session_state.pop("_password_reset_success", False):
         st.success("Tu contraseña fue actualizada. Inicia sesión con tu nueva contraseña.")
     with st.form("form_login"):
@@ -37,6 +41,8 @@ def _render_login():
                 with st.spinner("Iniciando sesión…"):
                     result = api.login(email.strip(), password)
                 if result["success"]:
+                    if on_login is not None:
+                        on_login()
                     st.rerun()
                 else:
                     st.error(result.get("error", "No se pudo iniciar sesión. Intenta de nuevo."))
@@ -162,7 +168,7 @@ def _render_reset():
     st.button("Volver a iniciar sesión", key="back_from_reset", on_click=_show_auth_view, args=("login",))
 
 
-def render_auth_page():
+def render_auth_page(on_login=None):
     """Renderiza el portal de acceso institucional con diseño oficial de Jalisco."""
 
     st.markdown("""
@@ -243,7 +249,7 @@ header[data-testid="stHeader"], section[data-testid="stSidebar"] { display: none
 
     with st.container(key="auth_card"):
         st.markdown(
-            f'<div class="auth-identity"><img src="{_logo("Virales.png")}" alt="VIRALES">'
+            f'<div class="auth-identity"><img src="{_logo("Virales.png")}" alt="VIRALES" width="190" style="width:190px;max-width:75%;height:auto">'
             '<p>Vigilancia epidemiológica · Jalisco</p></div>',
             unsafe_allow_html=True,
         )
@@ -270,10 +276,10 @@ header[data-testid="stHeader"], section[data-testid="stSidebar"] { display: none
         elif st.session_state.get("auth_view") == "recovery":
             _render_recovery()
         else:
-            _render_login()
+            _render_login(on_login=on_login)
 
         st.markdown(
-            f'<div class="auth-institution"><img src="{_logo("jalisco.png")}" alt="Jalisco, Gobierno del Estado">'
+            f'<div class="auth-institution"><img src="{_logo("jalisco.png")}" alt="Jalisco, Gobierno del Estado" width="145" style="width:145px;max-width:60%;height:auto">'
             '<p>Secretaría de Salud</p></div>',
             unsafe_allow_html=True,
         )

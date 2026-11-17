@@ -36,15 +36,23 @@ def _ultima_observada_por_enfermedad(model_info: dict, codigo: str) -> str | Non
     return por_enf.get(codigo, {}).get("ultima_semana_datos")
 
 
-def _obtener_datos(model_info: dict, semana_fallback: str, enfermedad: str | None) -> list[dict]:
-    if enfermedad:
-        sem_obj = _semana_por_enfermedad(model_info, enfermedad, semana_fallback)
-        return api.get_predictions_bulk(semana=sem_obj, enfermedad=enfermedad)
-
+def _obtener_datos(model_info: dict, semana_fallback: str, enfermedad: str | None, resumen: dict | None = None) -> list[dict]:
+    proyecciones = (resumen or {}).get("predicciones", {})
     datos = []
-    for codigo in ("dengue", "influenza", "covid"):
+    for codigo in ([enfermedad] if enfermedad else ("dengue", "influenza", "covid")):
         sem_obj = _semana_por_enfermedad(model_info, codigo, semana_fallback)
-        datos.extend(api.get_predictions_bulk(semana=sem_obj, enfermedad=codigo))
+        incluidas = proyecciones.get(codigo)
+        if incluidas is not None and all(item.get("semana") == sem_obj for item in incluidas):
+            datos.extend({
+                **item,
+                "municipio_id": str(item["municipio"]),
+                "municipio": item.get("nombre") or str(item["municipio"]),
+                "municipio_nombre": item.get("nombre") or str(item["municipio"]),
+                "enfermedad": codigo,
+            } for item in incluidas)
+        else:
+            # Compatibility with a backend that does not include projections yet.
+            datos.extend(api.get_predictions_bulk(semana=sem_obj, enfermedad=codigo))
     return datos
 
 
@@ -100,9 +108,6 @@ def render_resumen_view():
         return
 
     model_info = {} if DEMO_MODE else api.get_model_info()
-    if not DEMO_MODE and not model_info.get("por_enfermedad"):
-        api._clear_read_cache()
-        model_info = api.get_model_info()
 
     filtro_enfermedad, filtro_periodo = st.columns(2)
     with filtro_enfermedad:
@@ -125,7 +130,7 @@ def render_resumen_view():
     if DEMO_MODE:
         st.caption("Vista de demostración con datos de ejemplo.")
 
-    datos = _obtener_datos(model_info, semana_disponible, codigo_seleccionado)
+    datos = _obtener_datos(model_info, semana_disponible, codigo_seleccionado, resumen=resumen)
     df = pd.DataFrame(datos)
     if df.empty:
         st.info("No hay información disponible para los filtros seleccionados.")
